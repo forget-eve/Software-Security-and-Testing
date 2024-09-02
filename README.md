@@ -497,7 +497,7 @@
 
 #### Safety VS. Security
 
-- 国内外大多数软件安全标准中，软件安全用的是Software $\color{red}{Safety]$ ，而非Software  $\color{red}{Security]$
+- 国内外大多数软件安全标准中，软件安全用的是Software $\color{red}{Safety}$ ，而非Software  $\color{red}{Security}$
   - safety侧重于对 `无意` 造成的事故或事件进行安全保护，可以是加强人员培训、规范操作流程、完善设计等方面的安全防护工作
   - security则侧重于对 `人为的有意` 的破坏进行的保障和保护，比如部署专门安全设备进行防护、加强安全检测等
 
