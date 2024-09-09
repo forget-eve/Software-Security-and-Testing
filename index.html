@@ -45,6 +45,19 @@
           font-weight:bold;
           color:#244b8a;
       }
+      .tab-badge {
+          position: absolute;
+          top: 0;
+          right: 0;
+          transform: translate(35%, -45%);
+          padding: 0.25em 0.35em;
+          border-radius: 3px;
+          background: red;
+          color: white;
+          font-family: sans-serif;
+          font-size: 11px;
+          font-weight: bold;
+      }
     </style>
     <title>软件安全与测试</title>
   </head>
@@ -64,6 +77,27 @@
           fontsize:'0.9em',
           color:'pink',
           language:'chinese'
+        },
+        chat: {
+          // 聊天标题
+          title: '小tips',
+          // 设置头像
+          users: [
+            {nickname: 'Tips', avatar: './img/Tips.jpg' },
+          ],
+          // 在右侧显示消息（自己发出的）
+          myself: 'Tips',
+          // 动画延时 （毫秒）
+          animation: 50,
+          // 面板导航栏风格，支持 "mac" 与 "windows"
+          os: 'mac',
+        },
+        tabs: {
+          persist: true, // default
+          sync: false, // default
+          theme: 'material', // default
+          tabComments: true, // default
+          tabHeadings: true // default
         },
         busuanzi: true,
         search: {
@@ -112,7 +146,11 @@
     <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
     <!-- Docsify v4 -->
     <script src="https://unpkg.com/docsify-busuanzi@1.0.1/dist/docsify-busuanzi.min.js"></script>
+     <!-- Docsify Chat -->
+    <script src="//cdn.jsdelivr.net/npm/docsify-chat/lib/docsify-chat.min.js"></script>
     <script src="//unpkg.com/docsify-count/dist/countable.js"></script>
+    <!-- docsify-tabs (latest v1.x.x) -->
+    <script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1"></script>
     <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.4.0/dist/mermaid.min.js"></script>
   </body>
