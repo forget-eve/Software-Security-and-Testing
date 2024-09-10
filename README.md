@@ -1076,9 +1076,14 @@ int main(int argc, char** argv){
 }
 ```
 
-> - 假设上述代码文件名为 `pwn.c` ，则进行编译结果如下：
+> - 假设上述代码文件名为 `pwn1.c` ，则进行编译结果如下：
 
-
+```term
+$ gcc -g -o pwn1 pwn1.c
+pwn1.c:17:2: warning: no newline at end of file
+/tmp/ccEHWCOv.o(.text+0x1e): In function `main`:
+/home/example/pwn1.c:7: warning : the `gets` function is dangerous and should not be used.
+```
 
 
 ### 缓冲区溢出简介
