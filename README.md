@@ -1060,7 +1060,7 @@
 
 #### 最简单的一个pwn
 
-```C
+```c
 #include <stdio.h>
 
 int main(int argc, char** argv){
@@ -1107,7 +1107,7 @@ Segmentation fault
 #### 另一个pwn(改造自pwnable.kr-bof)
 
 
-```C
+```c
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1134,7 +1134,7 @@ int main(int argc, char** argv){
 
 ##### 最简单pwn之改造
 
-```C
+```c
 #include <stdio.h>
 
 int gets_fun(){
@@ -1159,7 +1159,7 @@ int main(int argc, char** argv){
 
 ##### 最简单pwn之再改造
 
-```C
+```c
 #include <stdio.h>
 
 int gets_fun(){
@@ -1322,7 +1322,7 @@ int main(){
 
 <!-- chat:end -->
 
-```C
+```c
 // 程序命名为main.c
 #include <stdio.h>
 
@@ -1385,7 +1385,7 @@ Error.
 - [x] 向缓冲区写入超过缓冲区长度的内容，造成缓冲区溢出，破坏程序的堆栈，使程序转而执行其他的指令，达到攻击的目的
 - [x] 原因：程序中缺少错误检测
 
-```C
+```c
 #include <string.h>
 
 void func(char *str) {
@@ -1498,7 +1498,7 @@ int main(){
 
 #### **栈溢出的例子1**
 
-```C
+```c
 #include <stdio.h>
 
 int main(){
@@ -1552,7 +1552,7 @@ Segmentation fault
 
 #### **栈溢出的例子2**
 
-```C
+```c
 #include <stdio.h>
 
 void function(int a, int b, int c){
@@ -1688,7 +1688,7 @@ End of assembler dump.
 
 - [x] 修改后的程序
 
-```C
+```c
 #include <stdio.h>
 
 void function(int a, int b, int c) {
@@ -1795,7 +1795,7 @@ Breakpoint 1, function (a=1, b=2, c=3) at ovr_ret_new.c:6
 
 #### **缺陷程序**
 
-```C
+```c
 // 命名为hello.c
 #include <stdio.h>
 #include <string.h>
