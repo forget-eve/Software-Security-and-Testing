@@ -1055,6 +1055,38 @@
 - [x] 网络安全漏洞分类分级指南(GB/T 30279—2020)
 
 ## 内存结构与缓冲区溢出
+
+### 几个ctf中的pwn例子
+
+#### 最简单的一个pwn
+
+```C
+#include <stdio.h>
+int main(int argc, char** argv){
+  int modified;
+  char buffer[10];
+  modified = 0;
+  gets(buffer);
+  if (modified != 0){
+    printf("Congratulations, you pwned it,\n");
+  }
+  else{
+    printf("Please try again.\n");
+  }
+}
+```
+
+> - 假设上述代码文件名为 `pwn.c` ，则进行编译结果如下：
+
+
+
+
+### 缓冲区溢出简介
+
+### Linux内存结构
+
+### 函数调用
+
 ## 栈溢出漏洞
 ## 堆溢出漏洞
 ## 整数溢出漏洞
