@@ -12,6 +12,9 @@
       href="//cdn.jsdelivr.net/npm/docsify@4/themes/vue.css"
     />
     <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/mermaid@10/" />
+    <!--termynal.js-->
+    <link rel="stylesheet" href="termynal.css">
+    <link rel="stylesheet" href="custom.css">
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.27"></script>
     <!-- MathJax 配置 -->
     <script type="text/x-mathjax-config">
@@ -134,6 +137,15 @@
             // 每个页面渲染完成后手动渲染 mermaid 图表
               mermaid.init(undefined, '.mermaid');
             });
+            /*termynal.js*/
+            hook.beforeEach(function(content){
+                return beforeEach(content);
+            });
+            hook.doneEach(function (){
+                setupTermynal();
+                showRandomAnnouncement('announce-left', 5000)
+                showRandomAnnouncement('announce-right', 10000)
+            });
           }
         ]
       };
@@ -151,6 +163,9 @@
     <script src="//unpkg.com/docsify-count/dist/countable.js"></script>
     <!-- docsify-tabs (latest v1.x.x) -->
     <script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1"></script>
+    <!--termynal.js-->
+    <script src="termynal.js"></script>
+    <script src="custom.js"></script>
     <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.4.0/dist/mermaid.min.js"></script>
   </body>
