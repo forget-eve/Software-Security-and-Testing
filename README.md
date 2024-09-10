@@ -1091,13 +1091,13 @@ pwn1.c:17:2: warning: no newline at end of file
 
 ```term
 $ ./pwn1
-# 此处输入 $ 1111
+## $ 1111
 Please try again.
 ```
 
 ```term
 $ ./pwn1
-# 此处输入 $ 11111111111111
+## $ 11111111111111
 Congratulations, you pwned it.
 Segmentation fault
 ```
@@ -1521,13 +1521,13 @@ $ gcc -g -o main main.c
 
 ```term
 $ ./main
-# $ aaaa
+## $ aaaa
 aaaa
 $ ./main
-# $ aaaaaa
+## $ aaaaaa
 aaaaaa
 $ ./main
-# $ aaaaaaaaaaaaaaa
+## $ aaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaa
 Segmentation fault
 ```
@@ -1552,17 +1552,288 @@ Segmentation fault
 
 #### **栈溢出的例子2**
 
+```C
+#include <stdio.h>
+
+void function(int a, int b, int c){
+  char buffer1[5];
+  char buffer2[10];
+  int *ret;
+  ret = buffer1 + 12;
+  (*ret) += 8;
+}
+
+int main(){
+  int x;
+  x = 0;
+  function(1, 2, 3);
+  x = 1;
+  printf("%d\n", x);
+  return 0;
+}
+```
+
 - [x] 在子函数function中，栈分配buffer1，然后定义一个指向int型变量的指针ret
 
-- [x] 在栈中，buffer1虽然只有5个字节，但是由于对齐分配，实际上分配了8个字节，所以，buffer1+8就是ebp，buffer1+12存储的就应该是返回地址
+- [x] 在栈中，buffer1虽然只有5个字节，但是由于对齐分配，实际上分配了8个字节，所以，<span style="color:red;">buffer1+8就是ebp，buffer1+12存储的就应该是返回地址</span>
 
-- [x] 将该返回地址的内容加8，则会跳过语句“x = 1;”，因此，打印结果应该是0
+- [x] <span style="color:red;">将该返回地址的内容加8，则会跳过语句“x = 1;”，因此，打印结果应该是0</span>
+
+> - 为便于理解，在此处画出一个栈图，如下所示(该图有点小问题，也就是function返回地址存储地址不是和x = 1语句紧挨着，但是其值+8即可得到printf的地址，同时本图为了简单也没有画buffer2，其在buffer1和ret之间)。
+
+<p align="center">
+  <img src="./img/栈溢出的例子2.png"></img>
+</p>
+
+<!-- tabs:start -->
+
+##### **在Redhat 6.2上测试**
+
+```term
+$ gcc -g -o ovr_ret ovr_ret.c 
+ovr_ret.c: In function `function':
+ovr_ret.c:6: warning: assignment from incompatible pointer type
+$ ./ovr_ret 
+0
+```
+
+> - 由此可见，分析正确，函数的返回地址确实被改写，程序并没有执行语句“x=1;”，程序的打印结果为0，通过改写函数返回地址，即可定制程序流程。
+
+##### **在Debian 2.4.18上测试**
+
+```term
+$ gcc -g -o ovr_ret ovr_ret.c 
+ovr_ret.c: In function `function':
+ovr_ret.c:6: warning: assignment from incompatible pointer type
+$ ./ovr_ret 
+1
+```
+
+- [x] 为了看为什么结果不一致，此时引入 <kbd>gdb</kbd> 进行调试。
+
+- [x] gdb
+  -  file  装入想要调试的可执行文件
+  -  kill  终止正在调试的程序
+  -  list  列出产生执行文件的源代码的一部分
+  -  next  执行一行源代码但不进入函数内部
+  -  step  执行一行源代码而且进入函数内部
+  -  run  执行当前被调试的程序
+  -  quit  终止 gdb
+  -  watch  使你能监视一个变量的值而不管它何时被改变
+  -  break  在代码里设置断点, 这将使程序执行到这里时被挂起
+  -  make  使你能不退出gdb 就可以重新产生可执行文件
+  -  shell  使你能不离开gdb 就执行UNIX shell 命令
+  -  info all
+    - ebp  栈底
+    - esp  栈顶
+    - eip  CPU下次要执行的指令的地址
+    - esi  寻址数据段DS 
+
+> 使用 <kbd style="color:green">gdb</kbd> 进行调试如下。
+
+```term
+$ gdb ovr_ret
+## (gdb) $ b 6
+Breakpoint 1 at 0x804838a: file ovr_ret.c, line 6.
+## (gdb) $ r
+Starting program: /home/dayin/ovr_ret 
+
+Breakpoint 1, function (a=1, b=2, c=3) at ovr_ret.c:6
+6          ret = buffer1 + 12;
+## (gdb) $ x $esp                     
+0xbffffcf0:     0x4014a870
+## (gdb) $ x $ebp
+0xbffffd28:     0xbffffd48
+## (gdb) $ x buffer1
+0xbffffd10:     0x08048400
+// 此处可以推出 $ebp– buffer1 = 24
+## (gdb) $ x buffer2
+0xbffffd00:     0xbffffdac
+## (gdb) $ x/20 $esp
+0xbffffcf0:     0x4014a870      0xbffffd04      0x40030c85      0x4014a880
+0xbffffd00:     0xbffffdac      0xbffffd24      0x40030d3f      0x40016ca0
+0xbffffd10:     0x08048400      0x08049604      0xbffffd28      0x0804828d
+0xbffffd20:     0x40017074      0x40017af0      0xbffffd48      0x080483d5 retip
+0xbffffd30:     0x00000001      0x00000002      0x00000003      0x4014a880
+// 此处可以推出 retip = $ebp + 4
+// 推导出
+// retip – buffer1 = 28
+## (gdb) $ disas main
+Dump of assembler code for function main:
+0x080483a2 <main+0>:    push   %ebp
+0x080483a3 <main+1>:    mov %esp,%ebp
+0x080483a5 <main+3>:    sub    $0x18,%esp
+0x080483a8 <main+6>:    and    $0xfffffff0,%esp
+0x080483ab <main+9>:    mov $0x0,%eax
+0x080483b0 <main+14>:   sub    %eax,%esp
+0x080483b2 <main+16>:   movl $0x0,0xfffffffc(%ebp)
+0x080483b9 <main+23>:   movl $0x3,0x8(%esp)
+0x080483c1 <main+31>:   movl $0x2,0x4(%esp)
+0x080483c9 <main+39>:   movl $0x1,(%esp)
+0x080483d0 <main+46>:   call   0x8048384 <function>
+0x080483d5 <main+51>:   movl $0x1,0xfffffffc(%ebp) // 此处
+0x080483dc <main+58>:   mov 0xfffffffc(%ebp),%eax // 此处
+0x080483df <main+61>:   mov %eax,0x4(%esp)
+0x080483e3 <main+65>:   movl $0x8048514,(%esp)
+0x080483ea <main+72>:   call   0x80482b0 <_init+56>
+0x080483ef <main+77>:   leave  
+0x080483f0 <main+78>:   ret    
+End of assembler dump.
+// new retip – old retip = 7
+```
+
+- [x] 修改后的程序
+
+```C
+#include <stdio.h>
+
+void function(int a, int b, int c) {
+  char buffer1[5];
+  char buffer2[10];
+  int *ret;
+  ret = buffer1 + 28;
+  (*ret) += 7;
+}
+
+int main() {
+  int x;
+  x = 0;
+  function(1,2,3);
+  x = 1;
+  printf("%d\n",x);
+  return 0;
+}
+```
+
+> 运行结果如下：
+
+```term
+$ gcc -g -o ovr_ret_new ovr_ret_new.c 
+ovr_ret_new.c: In function `function':
+ovr_ret_new.c:6: warning: assignment from incompatible pointer type
+$ ./ovr_ret_new 
+0
+```
+
+<!-- tabs:end -->
 
 <!-- tabs:end -->
 
 ### 一个溢出和攻击的演示
 
+- [x] 缓冲区溢出攻击
+- [x] Shellcode解析
+- [x] 攻击程序
+- [x] 运行平台
+  - Linux debian 2.4.18-bf2.4 #1 Son Apr 14 09:53:28 CEST 2002 i686 unknown
+  - Gcc 3.3.5
 
+#### 缺陷程序
+
+```C
+// 命名为hello.c
+#include <stdio.h>
+#include <string.h>
+
+void SayHello(char* name){
+  char tmpName[60];
+  // buffer overflow
+  strcpy(tmpName, name);
+  printf("Hello %s\n", tmpName);
+}
+
+int main(int argc, char** argv){
+  if (argc != 2) {
+    printf("Usage: hello <name>.\n");
+    return 1;
+  }
+  SayHello(argv[1]);
+  return 0;
+}
+```
+
+> - 运行情况如下：
+
+```term
+$ gcc–g –o hello hello.c
+$ ./hello `perl-e 'print "A" x 60'`
+Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+$ ./hello `perl-e 'print "A" x 71'`
+Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+$ ./hello `perl-e 'print "A" x 72'`
+Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+Segmentation fault
+```
+
+> - 调试情况如下：
+
+```term
+$ gdb hello
+## (gdb) $ l
+## (gdb) $ b 9
+## (gdb) $ r `perl -e 'print "A" x 72'`
+## (gdb) $ x/8 $esp
+0xbffffc90:     0x40090fd0      0xbffffe2f      0x4008978e      0x4014a880
+0xbffffca0:     0x4014a870      0xbffffcb4      0x40030c85      0x4014a880
+## (gdb) $ x tmpName
+0xbffffca0:     0x4014a870
+## (gdb) $ x/4 $ebp
+0xbffffce8:     0xbffffcf8      0x0804842c      0xbffffe41      0xbffffd54
+// $ebp返回地址:0x0804842c(这个是后续调试知道的)
+// $ebp – tmpName = 0xbffffce8–0xbffffca0=72
+## (gdb) $ disas main
+Dump of assembler code for function main:
+0x080483f1 <main+0>:    push   %ebp
+0x080483f2 <main+1>:    mov    %esp,%ebp
+0x080483f4 <main+3>:    sub    $0x8,%esp
+0x080483f7 <main+6>:    and    $0xfffffff0,%esp
+0x080483fa <main+9>:    mov    $0x0,%eax
+0x080483ff <main+14>:   sub    %eax,%esp
+0x08048401 <main+16>:   cmpl   $0x2,0x8(%ebp)
+0x08048405 <main+20>:   je    
+0x804841c <main+43>
+0x08048407 <main+22>:   movl   $0x804855e,(%esp)
+0x0804840e <main+29>:   call   0x80482d8 <_init+56>
+0x08048413 <main+34>:   movl   $0x1,0xfffffffc(%ebp)
+0x0804841a <main+41>:   jmp    0x8048433 <main+66>
+0x0804841c <main+43>:   mov    0xc(%ebp),%eax
+0x0804841f <main+46>:   add    $0x4,%eax
+0x08048422 <main+49>:   mov    (%eax),%eax
+0x08048424 <main+51>:   mov    %eax,(%esp)
+0x08048427 <main+54>:   call 0x80483c4 <SayHello> // 返回地址
+0x0804842c <main+59>:   movl   $0x0,0xfffffffc(%ebp)
+0x08048433 <main+66>:   mov    0xfffffffc(%ebp),%eax
+0x08048436 <main+69>:   leave  
+0x08048437 <main+70>:   ret    
+End of assembler dump.
+## (gdb) $ x/24 $esp
+0xbffffc90:     0x40090fd0      0xbffffe2f      0x4008978e      0x4014a880
+0xbffffca0:     0x4014a870      0xbffffcb4      0x40030c85      0x4014a880
+0xbffffcb0:     0xbffffd60      0xbffffcd4      0x40030d3f      0x40016ca0
+0xbffffcc0:     0x08048440      0x08049660      0xbffffcd8      0x080482b5
+0xbffffcd0:     0x40017074      0x40017af0      0xbffffcf8      0x0804845b
+0xbffffce0:     0x4014a880      0x080484a0      0xbffffcf8      0x0804842c
+## (gdb) $ n //执行“strcpy(tmpName, name);”
+11          printf("Hello %s\n", tmpName);
+## (gdb) $ x/24 $esp
+0xbffffc90:     0xbffffca0      0xbffffe41      0x4008978e      0x4014a880
+0xbffffca0:     0x41414141      0x41414141      0x41414141      0x41414141
+0xbffffcb0:     0x41414141      0x41414141      0x41414141      0x41414141
+0xbffffcc0:     0x41414141      0x41414141      0x41414141      0x41414141
+0xbffffcd0:     0x41414141      0x41414141      0x41414141      0x41414141
+0xbffffce0:     0x41414141      0x41414141      0xbffffc00      0x0804842c
+// $ebp内容被覆盖Segmentation fault
+```
+
+#### 插曲：strncpyVS. memcpy
+
+- [x] <kbd>char *strncpy(char *dest, char *src, int n)</kbd>
+  - 把src所指向的字符串中以src地址开始的前n个字节复制到dest所指的数组中，并返回dest
+  - strncpy_百度百科
+
+- [x] <kbd>void *memcpy(void *dest, const void *src, size_t n)</kbd>
+  - 从源src所指的内存地址的起始位置开始拷贝n个字节到目标dest所指的内存地址的起始位置中
+  - memcpy_百度百科
 
 ## 堆溢出漏洞
 ## 整数溢出漏洞
