@@ -1062,17 +1062,19 @@
 
 ```C
 #include <stdio.h>
+
 int main(int argc, char** argv){
   int modified;
   char buffer[10];
   modified = 0;
   gets(buffer);
   if (modified != 0){
-    printf("Congratulations, you pwned it,\n");
+    printf("Congratulations, you pwned it.\n");
   }
   else{
     printf("Please try again.\n");
   }
+  return 0;
 }
 ```
 
@@ -1085,14 +1087,483 @@ pwn1.c:17:2: warning: no newline at end of file
 /home/example/pwn1.c:7: warning : the `gets` function is dangerous and should not be used.
 ```
 
+> - 此时就会有gcc的警告表示gets不安全，那么此时进行两个不同输入
+
+```term
+$ ./pwn1
+# 此处输入 $ 1111
+Please try again.
+```
+
+```term
+$ ./pwn1
+# 此处输入 $ 11111111111111
+Congratulations, you pwned it.
+Segmentation fault
+```
+
+> - 很明显能看出由于 `buffer` 大小程序本意上应该是10，但是程序分配地址空间时，是连续分配的，所以当程序分配好10个大小的 `buffer` 以后，其就会分配 `modified` 变量地址，如果在 `gets` 时一次输入超过十个字符，则后续字符会分配给 `modified` 变量导致其内容更改，此时其值不为0，同时触发段错误([`Segmentation fault`](https://zh.wikipedia.org/wiki/%E8%A8%98%E6%86%B6%E9%AB%94%E5%8D%80%E6%AE%B5%E9%8C%AF%E8%AA%A4))
+
+#### 另一个pwn(改造自pwnable.kr-bof)
+
+
+```C
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+void func(int key){
+  char overflowme[32];
+  printf("overflowme");
+  gets(overflowme);
+  if (key == 0xcafebabe){
+    system("/bin/sh");
+  }
+  else{
+    printf("Nah..\n");
+  }
+}
+
+int main(int argc, char** argv){
+  func(0xdeadbeef);
+  return 0;
+}
+```
+
+> - 此处同上(overflowme导致的缓冲区溢出)。
+
+##### 最简单pwn之改造
+
+```C
+#include <stdio.h>
+
+int gets_fun(){
+  char buffer[10];
+  gets(buffer);
+  return 0;
+}
+
+int main(int argc, char** argv){
+  int modified;
+  modified = 0;
+  gets_fun();
+  if (modified != 0){
+    printf("Congratulations, you pwned it.\n");
+  }
+  else{
+    printf("Please try again.\n");
+  }
+  return 0;
+}
+```
+
+##### 最简单pwn之再改造
+
+```C
+#include <stdio.h>
+
+int gets_fun(){
+  char buffer[10];
+  gets(buffer);
+  return 0;
+}
+
+int main(int argc, char** argv){
+  int modified;
+  modified = 0;
+  gets_fun();
+  modified = 0;
+  if (modified != 0){
+    printf("Congratulations, you pwned it.\n");
+  }
+  else{
+    printf("Please try again.\n");
+  }
+  return 0;
+}
+```
 
 ### 缓冲区溢出简介
 
+#### 缓冲区溢出历史
+
+- http://en.wikipedia.org/wiki/Buffer_overflow
+- 最早的攻击：1988年UNIX下的Morris worm，利用的是fingerd的缓冲区溢出
+- 1996年，Aleph One在第49期Phrack杂志上发表《Smashing The Stack for Fun and Profit》
+- 1999年，Matt Conover(16岁)，heap/bss overflow
+- 2000年，format string vulnerability
+- 2002年，Integer overflow
+- 其他的攻击手法(others)
+  - 利用ELF文件格式的特性如：覆盖.plt(过程连接表)、.dtor(析构函数指针)、.got(全局偏移表); return-to-libc(返回库函数)等的方式进行攻击
+
+#### 缓冲区溢出攻击的危害
+
+- 缓冲区溢出漏洞大量存在于各种软件中
+- 利用缓冲区溢出的攻击，会导致系统崩溃、敏感信息泄漏、获得系统特权等严重后果
+- CWE Top 25 Most Dangerous Software Weaknesses
+  - http://cwe.mitre.org/top25/index.html
+
 ### Linux内存结构
+
+- [x] Linux及其它几乎所有Intel x86系统、Solaris, etc
+- [x] 分页式存储管理
+- [x] 平面内存结构，4GB或更大逻辑地址空间
+- [x] 栈从下往上生长
+- [x] C语言不进行边界检查
+
+#### 进程内存布局
+
+<p align="center">
+  <img src="./img/进程内存布局.png"></img>
+</p>
+
+> - 一般静态存储值都是在栈上分配地址，动态分配的地址都在堆上。
+> - 未初始化的数据一般放在BSS段，而数据段一般放初始化的全局变量，比如static变量，其一般在声明时直接赋值。
+
+```
+#include <stdio.h>
+
+int x = 100;
+int main(){
+  // data stored on stack
+  int a = 2;
+  float b = 2.5;
+  static int y;
+
+  // allocate memory on heap
+  int *ptr = (int *)malloc(2 * sizeof(int));
+
+  // values 5 and 6 stored on heap
+  ptr[0] = 5;
+  ptr[1] = 6;
+
+  // deallocate memory on heap
+  free(ptr);
+
+  return 1;
+}
+```
+
+> - 上述代码所对应的栈结构如下所示。
+
+<p align="center">
+  <img src="./img/进程内存布局1.png"></img>
+</p>
+
+#### 栈
+
+- <span style="color: red;">栈 是一种 <span style="color: blue;">先进后出(First In Last Out)</span> 的 <span style="color: blue;">数据结构</span> 
+  - 就像子弹壳装弹，一粒一粒压进去 span style="color: blue;">入栈</span> )；打出来的时候，最先压进去的最后弹出来( <span style="color: blue;">出栈</span> )
+  - 如果进去顺序是123，出来顺序是321
+
+- 相对于广义的栈而言， <span style="color: red;">栈帧</span> 是操作系统为进程中的 <span style="color: blue;">每个函数调用</span> 划分的一个空间，每个栈帧都是一个独立的栈结构，而 <span style="color: red;">系统栈</span> 则是这些函数调用栈帧的集合
+
+- 系统栈由系统自动维护，用于实现高级语言中函数的调用
+
+##### 函数的栈帧
+
+- [x] 当函数被调用时，系统会为这个函数开辟一个新的栈帧，并把它压入栈区中，所以 <span style="color: blue;">正在运行的函数总是在系统栈区的栈顶</span> ( <span style="color: red;">当前栈帧</span> )。当函数返回时，系统会弹出该函数所对应的栈帧空间
+- [x] 栈帧的 <span style="color: red;">生长方向是 <span style="color: blue;">从高地址向低地址增长</span> 的
+- [x]  <span style="color: red;">ESP</span> ：扩展栈指针(Extended Stack Pointer)寄存器，其存放的指针指向 <span style="color: blue;">当前栈帧的 <span style="color: blue;">栈顶</span> 
+- [x]  <span style="color: red;">EBP</span> ：扩展基址指针(Extended Base Pointer)寄存器，其存放的指针指向 <span style="color: blue;">当前栈帧的 <span style="color: blue;">栈底</span> 
+- [x] 显然，ESP与EBP之间的空间即为 <span style="color: red;">当前栈帧空间</span> 
+
+<p align="center">
+  <img src="./img/函数的栈帧.png"></img>
+</p>
+
+<!-- chat:start -->
+
+<!-- title: 小Tips -->
+
+#### **Tips**
+
+如果 <span style="color: blue;">64位系统</span> ，则为 <span style="color: blue;">rsp、rbp</span> 
+
+<!-- chat:end -->
+
+- [x] 一个函数栈帧中主要包含如下信息：
+  - 前栈帧的 <span style="color: red;">栈底</span> 位置(即 <span style="color: red;">前栈帧EBP</span> ) ，用于在函数调用结束后恢复主调函数的栈帧(前栈帧的栈顶可计算得到)
+  - 该函数的 <span style="color:red;">局部变量</span> 
+  - 函数调用的 <span style="color: red;">参数</span> 
+  - 函数的 <span style="color: red;">返回地址RET</span> ，用于保存函数调用前指令的位置，以便函数返回时能恢复到调用前的代码区中继续执行指令
+
+<!-- chat:start -->
+
+<!-- title: 理解 -->
+
+#### **Tips**
+
+因为当前函数调用结束后，需要返回到调用该函数的地址(前栈帧)，同样的ESP和EBP也要移到前栈帧，而前栈帧的栈顶是可以计算得到的(当前函数的栈底)，即ESP的移动去向知道，但是EBP无法通过计算知道，因为不知道前栈帧的大小。所以在当前函数栈帧中需要记载前栈帧的EBP位置。
+
+<!-- chat:end -->
+
+##### 系统栈
+
+- [x] 主函数原型：
+  - <kbd style="color:green;">int main (int argc, char *argv[ ], char *envp[ ])</kbd>
+  - 示例： <kbd style="color:red;">ls -l /usr/include</kbd>
+
+<p align="center">
+  <img src="./img/系统栈.png"></img>
+</p>
+
+<p align="center">
+  <img src="./img/系统栈1.png"></img>
+</p>
+
+<!-- chat:start -->
+
+<!-- title: 理解 -->
+
+#### **Tips**
+
+调用 <kbd>main</kbd> 函数以后形成栈帧，其后面分别跟着其参数(<kbd>argc、argv、envp</kbd>)，而后两者其实为指针，指向对应第一个其对应的数组元素的存储地址，同时其对应的第一个数组元素也会指向一个以 <kbd>null</kbd> 结尾的字符串，这个字符串是执行程序的名称或路径，同时其是以 <kbd>null</kbd> 结尾是因为C语言一般字符串结尾以其作为判断。环境变量也是同理。
+
+<!-- chat:end -->
+
+```C
+// 程序命名为main.c
+#include <stdio.h>
+
+int main(int argc, char *argv[ ]){
+  if (argc == 2){
+    printf("%s\n", agrv[1]);
+  }
+  else{
+    printf("Error.\n");
+  }
+  return 0;
+}
+```
+
+> - 将上述程序编译运行，使用不同命令进行运行，即可知 `argv[0]` 为程序名称或者文件路径，并占用一个参数位置。
+
+```term
+$ gcc -g -o main main.c
+$ ./main c
+c
+$ ./main
+Error.
+$ ./main c 1
+Error.
+```
 
 ### 函数调用
 
+<p align="center">
+  <img src="./img/函数调用.png"></img>
+</p>
+
+#### 函数调用的步骤
+
+<p align="center">
+  <img src="./img/函数调用的步骤1.png"></img>
+  <img src="./img/函数调用的步骤2.png"></img>
+  <img src="./img/函数调用的步骤3.png"></img>
+  <img src="./img/函数调用的步骤4.png"></img>
+</p>
+
+#### 栈溢出
+
+<p align="center">
+  <img src="./img/栈溢出1.png"></img>
+</p>
+
+- [x] 修改相邻变量甚至返回地址
+
+<p align="center">
+  <img src="./img/栈溢出2.png"></img>
+</p>
+
+> - 如果用户增加输入字符串的长度，将会超过password数组的边界，从而覆盖前栈帧EBP，甚至是覆盖返回地址RET。当返回地址RET被覆盖后，将会造成进程执行跳转的异常。
+
 ## 栈溢出漏洞
+
+### 溢出攻击原理
+
+- [x] 向缓冲区写入超过缓冲区长度的内容，造成缓冲区溢出，破坏程序的堆栈，使程序转而执行其他的指令，达到攻击的目的
+- [x] 原因：程序中缺少错误检测
+
+```C
+#include <string.h>
+
+void func(char *str) {
+  char buf[16];
+  strcpy( buf, str);
+}
+
+int main(){
+  char *str = "This is definitelt longer than 12";
+  func(str);
+  return 1;
+}
+```
+
+> - 如果str的内容多于16个非0字符，就会造成buf的溢出，使程序出错
+> - `栈` 由 `高端地址` 向 `低端地址` 生长
+> - `缓冲区中的数据` 依然是从 `低端地址` 向 `高端地址` 生长
+> - 当复制数据到 `buffer` 时, 要复制的数据从 `buffer[0]` 的位置开始, 直到 `buffer[11]` 结束。如果仍有未复制完的数据,  `strcpy()` 函数将继续复制数据到 `buffer` 数组以上的区域, 如 `buffer[12]、buffer[13]` , 以此类推
+
+<p align="center">
+  <img src="./img/溢出攻击原理.png"></img>
+</p>
+
+- [x] 类似函数有 <kbd style="color:purple;">strcat、sprintf、vsprintf、gets、scanf</kbd> 等
+- [x] 一般溢出会造成程序读/写或执行非法内存的数据，引发 `segmentation fault` 异常退出
+- [x] 如果在一个<span style="color:blue;">suid</span>程序中精心构造内容，可以有目的的执行程序，如/bin/sh，得到root权限
+- [x] 对于使用C语言开发的软件，缓冲区溢出大部分是 `数组越界` 或 `指针非法引用` 造成的
+- [x] 现存的软件中可能存在缓冲区溢出攻击，因此缓冲区溢出攻击短期内不可能杜绝
+
+#### 缓冲区溢出攻击的要素
+
+- [x] 在进程的地址空间安排适当的代码( `shellcode` )
+- [x] 通过适当的初始化寄存器和内存，跳转到以上代码段执行
+
+<!-- tabs:start -->
+
+##### **安排代码的方法**
+
+<!-- tabs:start -->
+
+###### **利用进程中存在的代码**
+
+- 传递一个适当的参数
+- 如程序中有exec(arg)，只要把arg指向“/bin/sh”就可以了
+
+###### **植入法**
+
+- 把指令序列放到缓冲区中
+- 堆、栈、数据段都可以存放攻击代码，最常见的是利用栈
+
+<!-- tabs:end -->
+
+##### **控制程序转移到攻击代码的方法**
+
+<!-- tabs:start -->
+
+###### **利用栈帧**
+
+- [x] 溢出栈中的局部变量，使返回地址指向攻击代码，栈溢出攻击Stack Smashing Attack
+
+<p align="center">
+  <img src="./img/利用栈帧.png"></img>
+</p>
+
+###### **函数指针**
+
+- [x] 如果定义有函数指针，溢出函数指针前面的缓冲区，修改函数指针的内容
+
+<p align="center">
+  <img src="./img/函数指针.png"></img>
+</p>
+
+###### **长跳转缓冲区**
+
+- [x] setjmp/longjmp语句
+  - 实现非本地跳转(<span style="color:blue;">在栈上跳过若干调用帧</span>)
+    - 从一个深层嵌套的函数调用中直接返回，不经过正常的“调用-返回”序列
+    - 使一个信号处理程序转移到一个特殊的代码位置，sigsetjmp/siglongjmp
+  - 函数原型：
+    - int setjmp(jmp_buf env);
+      > - 返回：函数直接调用则为0；若从longjmp返回则为非0
+    - void longjmp(jmp_buf env, int retval );  retval值非0
+  - setjmp函数在env缓冲区中保存当前栈的内容，以供后面longjmp使用，并返回0。longjmp函数从env缓冲区中恢复栈的内容，然后触发一个从最近一次初始化env的setjmp调用的返回。然后setjmp返回，并带有非0的返回值retval
+
+- [x] 覆盖setjmp/longjmp的缓冲区内容，longjmp就可以跳转到攻击者的代码
+
+<!-- tabs:end -->
+
+<!-- tabs:end -->
+
+#### 常见的攻击技术
+
+- [x] 一个字符串中完成 `代码植入` 和 `跳转`
+  - 一般修改栈帧
+
+<p align="center">
+  <img src="./img/常见的栈溢出攻击技术1.png"></img>
+</p>
+
+- [x] 代码植入和缓冲区溢出不一定要在在一次动作内完成
+  - 攻击者可以先在一个缓冲区内 `放置代码` ，这是不能溢出的缓冲区；然后，攻击者通过溢出另外一个缓冲区来<span style="color:blue;">改写程序转移的指针</span>
+  - 这种方法一般用来解决可供溢出的缓冲区不够大(不能放下全部的攻击代码)的情况
+
+- [x] 如果攻击者试图使用已经常驻的代码而不是从外部植入代码，他们通常必须<span style="color:blue;">把代码作为参数调用</span>
+  - 例如，在libc(几乎所有的C程序都要它来连接)中的部分代码段会执行“exec(arg)”，其中arg就是参数。攻击者首先使用缓冲区溢出改变程序的参数arg，然后利用另一个缓冲区溢出使程序指针指向libc中的特定的代码段，此代码段中包括exec(arg)
+
+### 栈溢出的例子
+
+<!-- tabs:start -->
+
+#### **栈溢出的例子1**
+
+```C
+#include <stdio.h>
+
+int main(){
+  char a[4];
+  gets(a);
+  puts(a);
+  return 0;
+}
+```
+
+> - 编译时出现如下信息：
+
+```term
+$ gcc -g -o main main.c
+/tmp/cczLEaUN.o: In function `main`:
+/home/example/main.c:3:warning: the `gets` function is dangerous and should not be used. 
+```
+
+> - 不理会该信息，执行程序 `./main` ，有以下结果：
+
+```term
+$ ./main
+# $ aaaa
+aaaa
+$ ./main
+# $ aaaaaa
+aaaaaa
+$ ./main
+# $ aaaaaaaaaaaaaaa
+aaaaaaaaaaaaaaa
+Segmentation fault
+```
+
+> - 输入较多字符时就会造成 `Segmentation fault` 。
+
+<!-- chat:start -->
+
+<!-- title: 理解 -->
+
+#### **Tips**
+
+覆盖<span style="color:blue;">栈底内容</span>，不会报错；覆盖<span style="color:blue;">返回指针</span>，才会报错，此时，栈溢出了
+
+<!-- chat:end -->
+
+> 注：有些系统在覆盖栈底内容时，就已经报错了
+
+<p align="center">
+  <img src="./img/栈溢出的例子1.png"></img>
+</p>
+
+#### **栈溢出的例子2**
+
+- [x] 在子函数function中，栈分配buffer1，然后定义一个指向int型变量的指针ret
+
+- [x] 在栈中，buffer1虽然只有5个字节，但是由于对齐分配，实际上分配了8个字节，所以，buffer1+8就是ebp，buffer1+12存储的就应该是返回地址
+
+- [x] 将该返回地址的内容加8，则会跳过语句“x = 1;”，因此，打印结果应该是0
+
+<!-- tabs:end -->
+
+### 一个溢出和攻击的演示
+
+
+
 ## 堆溢出漏洞
 ## 整数溢出漏洞
 ## 格式化字符串漏洞
