@@ -841,6 +841,10 @@
 
 # 第二章 缓冲区溢出漏洞
 
+- [x] CWE Top 25 Most Dangerous Software Weaknesses http://cwe.mitre.org/top25
+- [x] Software Security Learning https://chybeta.github.io/2017/08/19/Software-Security-Learning/
+- [x] PWN Learning http://pwnable.kr/play.php(学习笔记：https://etenal.me/archives/972)
+
 ## 软件漏洞概述
 
 ### 信息安全漏洞
@@ -2113,5 +2117,874 @@ Breakpoint 1, main (argc=1, argv=0xbffffda4) at hello2.c:52
   - memcpy_百度百科
 
 ## 堆溢出漏洞
+
+### 堆溢出
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+typedef struct tagOBJ{
+  struct tagOBJ *fd;
+  struct tagOBJ *bk;
+  char buf[8];
+}
+
+void shell(){
+  system("/bin/sh");
+}
+
+void unlink(OBJ *P){
+  OBJ *BK;
+  OBJ *FD;
+  BK = P -> bk;
+  FD = P -> fd;
+  FD -> bk = BK;
+  BK -> fd = FD;
+}
+
+int main(int argc, char *argv[]){
+  malloc(1024);
+  OBJ *A = (OBJ*)malloc(sizeof(OBJ));
+  OBJ *B = (OBJ*)malloc(sizeof(OBJ));
+  OBJ *C = (OBJ*)malloc(sizeof(OBJ));
+
+  // double linked list: A <-> B <-> C (链表 vs. 数组?)
+  A -> fd = B;
+  B -> bk = A;
+  B -> fd = C;
+  C -> bk = B;
+
+  printf("here is stack address leak: %p\n", &A);
+  printf("here is heap address leak: %p\n", A);
+  printf("now that you have leaks, get shell!\n");
+
+  // heap overflow!
+  gets(A -> buf);
+
+  // exploit this unlink!
+  unlink(B);
+  return 0;
+
+}
+```
+
+### 堆在进程空间中的位置
+
+<p align="center">
+  <img src="./img/堆在进程空间中的位置.png"></img>
+</p>
+
+### 堆与栈的区别
+
+- <span style="color:red;">栈</span>空间由<span style="color:blue;">系统维护</span>。分配和回收都是由系统来完成的
+  - <span style="color:blue;">对程序员来说都是透明的</span>
+- [x] <span style="color:red;">堆是一种在程序运行时<span style="color:blue;">动态分配</span>的内存
+  - 所谓<span style="color:red;">动态</span>，是指所需内存的大小在程序设计时不能预先确定或内存过大无法在栈中进行分配，需要在程序运行时参考用户的反馈
+  - <span style="color:blue;">需要程序员使用专有的函数进行申请和释放</span>
+
+<p align="center">
+  <img src="./img/堆与栈的区别.png"></img>
+</p>
+
+### Linux堆管理算法
+
+- [x] Linux系统通过 <kbd style="color:red;">glibc</kbd> 程序库提供堆内存管理功能，存在两种堆管理算法
+  - glibc2.2.4及以下版本是使用Doug Lea的实现方法
+  - glibc2.2.5及以上版本采用了Wolfram Gloger的ptmalloc/ptmalloc2代码。ptmalloc2代码是从Doug Lea的代码移植过来的，增加了对多线程的支持，并引进了fastbin机制
+- [x] 从Doug lea的实现方法说起
+
+### Linux堆管理结构
+
+- [x] Linux整个堆区被划分成若干个连续的块(<span style="color:blue;">chunk</span>)，类似下图分布
+
+<p align="center">
+  <img src="./img/块.png"></img>
+</p>
+
+- [x] 标记：
+  - <kbd style="color:red;">U</kbd>— <span style="color:blue;">正在被使用的块</span>
+  - <kbd style="color:red;">F</kbd> — <span style="color:blue;">空闲的块</span>
+  - <kbd style="color:red;">TOP</kbd> — <span style="color:blue;">位于高地址最边缘的那个块(空闲)</span>
+
+#### 堆块(chunk)的结构
+
+- [x] 堆块的头部有一个用于管理当前块的管理结构(<span style="color:blue;">块首</span>)，这个管理结构的长度对于<span style="color:red;">正在使用</span>的chunk是<span style="color:red;">8字节，而对于<span style="color:darkcyan;">空闲的chunk</span>则为<span style="color:darkcyan;">16字节</span>
+- [x] 管理结构的定义如下：
+
+```c
+struct malloc_chunk
+{
+  int prev_size;  // 如果上一块是空闲, 此值为上一块的长度
+  int size;      // 当前块的长度，包括管理结构本身
+  struct malloc_chunk *fd;  // 双向链表的前指针
+  struct malloc_chunk *bk;  // 双向链表的后指针
+  // 空闲块才有后两个指针
+}
+```
+
+<!-- tabs:start -->
+
+##### **U块的结构**
+
+- [x] U块的块首是8字节
+
+<p align="center">
+  <img src="./img/U块的结构.png"></img>
+</p>
+
+##### **F块的结构**
+
+- [x] F块的块首是16字节
+
+<p align="center">
+  <img src="./img/F块的结构.png"></img>
+</p>
+
+##### **P标志位**
+
+- [x] <span style="color:red;">“P”标志</span>是“当前块字节数”(chunk->size)中的最低一位，表示是<span style="color:blue;">否上一块正在被使用</span>
+  - 如果<span style="color:red;">P位为1</span>，则表示<span style="color:blue;">上一块正在被使用</span>，这时chunk->prev_size通常为零
+  - 如果<span style="color:red;">P位为0</span>，则表示<span style="color:blue;">上一块是空闲块</span>，这时chunk->prev_size字段其实是上一个块用户数据区的一部分
+- [x] 任何一个块的<span style="color:red;">空闲与否</span>是由<span style="color:red;">下一个块的</span><span style="color:blue;">chunk->size的</span><span style="color:red;">P标志</span>来确定的
+
+##### **M标志位**
+
+- [x] <span style="color:red;">“M”位</span>是表示此内存块<span style="color:blue;">是不是由mmap()分配的</span>
+- [x] 如果置1，则是由mmap()分配的，那么在释放时会以另外的方式处理，与现在的讨论无关
+- [x] P和M标志位的定义如下：
+
+```c
+#define PREV_INUSE 0x1
+#define IS_MMAPPED 0x2
+```
+
+<!-- tabs:end -->
+
+### 双向链表Bin
+
+- [x] 在Doug Lea实现的Malloc中，除了TOP块外的所有<span style="color:red;">空闲块</span><span style="color:blue;">以长度大小被分组</span>，它们的信息被存放在称为Bin的<span style="color:red;">双向循环链表</span>中，共有128个表项，它们分别存放特定长度的空闲内存块信息
+- [x] 系统在分配内存时<span style="color:blue;">首先</span>会到<span style="color:red;">Bin链表</span>中寻找是否存在<span style="color:blue;">合适大小的内存块</span>，如果找不到才会从<span style="color:red;">TOP块</span>中分割出一块来并把指针返回给用户进程
+- [x] <span style="color:red;">Bin链表</span>的<span style="color:blue;">索引指针</span>存放在一个<span style="color:blue;">数组</span>中，malloc根据块的大小来获取Bin链表指针在数组中的索引
+
+#### Bin链表索引
+
+- [x] <span style="color:blue;">小于512字节</span>的<span style="color:blue;">空闲</span>内存块被认为是<span style="color:red;">小块</span>，由于内存块的大小一定大于等于16字节而且是8的倍数，这些小块的信息被存放在62个Bin链表中(索引：0~61)
+  - 第1个Bin链表存放16字节大小内存块的信息；第2个链表存放24字节；第3个链表存放32字节的；
+  - 以此类推，第62个Bin链表存放504字节大小的空闲块信息
+  - 所有小块单个Bin链表所存放的块的<span style="color:blue;">大小都是一样的</span>
+- [x] 所有<span style="color:blue;">大于等于512字节</span>的<span style="color:blue;">空闲块被认为是<span style="color:red;">大块，它们的信息存放在后66个Bin链表中，每个Bin链表存放了<span style="color:blue;">一定长度范围</span>的空闲块
+
+#### Bin链表示意图
+
+<p align="center">
+  <img src="./img/Bin链表示意图.png"></img>
+</p>
+
+#### Bin链表的链接情况
+
+<p align="center">
+  <img src="./img/Bin链表的链接情况.png"></img>
+</p>
+
+#### 堆管理的系统调用
+
+- [x] <kbd style="color:red;">malloc</kbd> 函数
+  - 函数形式: void *malloc(long NumBytes)
+  - 功能:该函数分配了NumBytes个字节,并返回了指向这块内存的指针。如果分配失败,则返回一个空指针(NULL)
+  - 注意:<span style="color:blue;">返回的指针指向数据区,不是</span>指向真正的chunk<span style="color:blue;">头部</span>
+- [x] <kbd style="color:red;">free</kbd> 函数
+  - 函数形式: void free(void *FirstByte)
+  - 功能:将之前用malloc分配的空间还给程序或者是操作系统,也就是释放了这块内存,让它重新得到自由
+  - 注意:如果在free 过程中发现free的chunk<span style="color:blue;">前后有空闲的chunk</span>,则会<span style="color:blue;">触发unlink操作和堆块合并</span>, 合并后再加入bin链表
+
+#### 链表单元的删除
+
+- [x] Malloc的实现使用两个宏来完成对于Bin链表的插入和删除操作
+- [x] 用于删除单元的unlink宏定义如下：
+
+```c
+#define unlink(P, BK, FD){  \\ 带参宏定义
+  BK = P->bk;  \\ 说明：当替换列表一行写不下时，可以使用反斜线\作为续行符延续到下一行             
+  FD = P->fd;                             
+  FD->bk = BK;                          
+  BK->fd = FD;
+}
+```
+
+##### 删除操作图示
+
+<p align="center">
+  <img src="./img/删除操作图示.png"></img>
+</p>
+
+##### 目标
+
+- [x] unlink宏有两个写内存的操作。fd被写到(chunk->bk + 8)中，而bk被写到(chunk->fd + 12)中
+- [x] 如果能控制fd和bk这两个指针的值，就可以<span style="color:red;">将任意4个字节内容写到任意一个内存地址中</span>去！这正是所期望的
+- [x] <span style="color:blue;">目标就是设法</span><span style="color:red;">控制fd和bk中的内容</span>，并按照期望<span style="color:red;">触发unlink宏操作</span>，改变程序执行流程
+- [x] 首先必须清楚unlink宏的调用位置
+
+##### unlink宏的调用位置
+
+- [x] malloc()和free()的实现里面都使用到了unlink宏。触发malloc()里的unlink操作比较困难，所以先从free()说起
+
+```c
+void free(void_t *mem){
+  ...
+  if(chunk_is_mmappend(p)){ // 如果IS_MMAPPED位被设置
+    munmap_chunk(p);
+    return;
+  }
+  ...
+  p = mem2chunk(mem);  // 将用户地址转换成内部地址: p = mem - 8
+  ...
+  chunk_free(ar_ptr, p);
+}
+```
+
+##### chunk_free的执行流程
+
+- [x] 如果下一块是top节点，则与之合并
+- [x]如果上一块是空闲的，则与之合并
+  ```c
+  p = chunk_at_offset(p, -prevsz);
+  unlink(p, bck, fwd); /* 从链表中删除上一个结点 */
+  ...
+  top=(ar_ptr) = p;//合并到top块
+  ```
+- [x] 如果下一块不是top节点
+- [x] 如果上一块是空闲的，则与之合并
+  ```c
+  p = chunk_at_offset(p, -prevsz);
+  unlink(p, bck, fwd); /* 从链表中删除上一个结点 */
+  ```
+- [x] 如果下一个块是空闲的，则与之合并
+  ```c
+  unlink(next, bck, fwd); /* 从链表中删除下一个结点 */
+  ```
+- [x] 如果前后两块都不是空闲的，则做一些设置工作，然后将当前块插入到空闲链表中;
+
+##### 利用需满足的条件
+
+- [x] 有3个地方调用了unlink.如果想要执行它们，需要满足下列条件：
+  1. 当前块的IS_MMAPPED位必须被清零，否则不会执行chunk_free()
+  2. <span style="color:blue;">上一个块</span>是个<span style="color:blue;">空闲块</span>(当前块size的PREV_INUSE位清零)<span style="color:red;">或者</span>
+  3. <span style="color:blue;">下一个块</span>是个<span style="color:blue;">空闲块</span>(<span style="color:blue;">下下一个块</span>(p->next->next)size的PREV_INUSE位清零) 
+
+##### 一个实例程序
+
+```c
+// heap_overflow.c
+#include <stdlib.h>
+int main (int argc, char *argv[]{
+  char *buf, *buf1;
+  buf = malloc(16); /* 分配两块16字节内存 */
+  buf1 = malloc(16);
+  if (argc > 1)
+    memcpy(buf, argv[1], strlen(argv[1]));  /* 这里会发生溢出 */
+  printf(""%#p [buf](%.2d):%s\n", buf, strlen(buf), buf);
+  printf(""%#p [buf1](%.2d):%s\n", buf1, strlen(buf1), buf1);
+  printf("From buf to buf1 : %d\n\n", buf1 - buf);
+  printf("Before free buf\n");
+  free(buf);  /* 释放buf */
+  printf(""Before free buf1\n");
+  free(buf1);  /* 释放buf1 */
+  return 0;
+} /* End of main */
+```
+
+### 弱点程序分析
+
+- [x] <span style="color:blue;">弱点程序发生溢出时，可以覆盖下一个块的内部结构，但是并不能修改当前块的内部结构</span>，因此条件2是满足不了的。只能寄希望于条件3
+- [x] 所谓下下一个块的地址其实是由下一个块的数据来推算出来的，既然可以<span style="color:blue;">完全控制下一个块的数据</span>，就可以让<span style="color:blue;">下下一个块的size的PREV_INUSE位为零</span>。这样程序就会认为下一个块是个空闲块了弱点程序分析
+
+### 利用思路
+
+- [x] 假设当前块为块1,下一个块为块2，下下一个块为块3，如下图所示：
+
+<p align="center">
+  <img src="./img/利用思路.png"></img>
+</p>
+
+- [x] 只要能够通过修改size2，使得next2next指向一个可以控制的地址；之后在这个地址伪造一个块3，使得此块的
+size3的PREV_INUSE位置零即可；然后，在fd2处填入要覆盖的地址，例如函数返回地址，.dtors.GOT等等
+- [x] Solar Designer建议可以使用<kbd>__free_hook()</kbd>的地址，这样<span style="color:blue;">再下一次调用free()时就会执行我们的代码</span>。在bk2处可以填入shellcode的地址
+
+### 如何构造块？
+
+- [x] 实际构造的时候块2的结构如下：
+  ```c
+  prev_size2 = 0x11223344  /* 可以使用任意值 */
+  size2 = (next2next - next) /* 这个数值必须是4的倍数 */
+  fd2 = __free_hook- 12 /* 将shellcode地址刚好覆盖到
+  __free_hook地址处 */
+  bk2= shellcode
+  ```
+- [x] 伪造的块3则要求很低，只需要让size3的最后一位为0即可：
+  ```c
+  prev_size3 = 0x11223344 /* 可以使用任意值 */ 
+  size3 = 0xffffffff & ~PREV_INUSE  /* 这里的0xffffffff可以用任意非零值替换*/
+  ```
+
+### 伪造块的位置问题
+
+- [x] 伪造的块3可以放在任意可能的位置，例如块2的前面或者后面
+  - 如果块3放在块2的后面，由于size2是4个字节，因此如果距离比较小的话，那么size2是肯定要包含零字节的，这会<span style="color:blue;">中断数据拷贝</span>，因此距离必须足够远，以至于四个字节均不为零，堆栈段是一个不错的选择，通过设置环境变量等方法也可以准确的得到块3的地址
+  - 如果将块3放到块2的前面，那么size2就是个<span style="color:blue;">负值</span>，通常是<span style="color:blue;">0xffffffxx</span>等等。这肯定满足size2不为零的要求，另外，这个距离也可以很精确的指定。因此决定采用这种方法
+
+<!-- tabs:start -->
+
+#### **第一种构造方法**
+
+
+- [x] 在上面的图上，将块3的8字节的内部结构放在了块1的用户数据区中，而块3的用户数据区实际上是从块2开始的
+- [x] 但是既然根本不关心块3的prev_size以及数据段，而块2的prev_size也不关心，因此还可以有更简化的版本：将块3往右移动4个字节，即让siez3与prev_size2重合
+
+<p align="center">
+  <img src="./img/第一种构造方法.png"></img>
+</p>
+
+#### **更精简的构造办法**
+
+<p align="center">
+  <img src="./img/第一种构造方法.png"></img>
+</p>
+
+- [x] 这样next2next - next = -4 = 0xfffffffc .则块2就可以重新构造一下：
+
+```c
+prev_size2 = 0x11223344 & ~PREV_INUSE;  /* 用原来的size3代替 */
+size2 = 0xfffffffc; /* 长度为-4 */  
+fd2 = __free_hook - 12; /*将shellcode地址刚好覆盖到__free_hook地址处*/
+bk2 = shellcode;
+```
+<!-- tabs:end -->
+
+### 堆溢出–小结
+
+- [x] 要达到利用free()函数调用来攻击的目的，需要满足以下条件：
+  1. 通过某些漏洞(例如堆溢出)来覆盖将要被free()的chunk
+  2. 在被覆盖chunk的位置上构造fake_chunk
+  3. fake_chunk要确保在free()函数调用过程中运行unlink宏
+  4. unlink宏所操作的内存将修改程序的流程
+- [x] 一般有两种方法：
+  1. 如果想利用上一块的unlink进行攻击，需要保证:
+    - chunk->size的IS_MMAPPED位为0
+    - chunk->size的PREV_INUSE位为0
+    - chunk + chunk->prev_size指向一个我们控制的伪造块结构
+    - 在一个确定的位置构造一个伪块
+  2. 如果想利用下一个块的unlink进行攻击，需要保证:
+    - chunk->size的IS_MMAPPED位为0
+    - chunk->size的PREV_INUSE位为1
+    - chunk + nextsz 指向一个我们控制的伪造块结构。
+      > - (nextsz = chunk->size & ~(PREV_INUSE|IS_MMAPPED))
+    - 在一个确定的位置构造一个伪块
+
+### 堆溢出–其他
+
+- [x] 前一部分说的都是利用<span style="color:blue;">free()的unlink()宏</span>来改变程序流程的方法，其实在<span style="color:blue;">malloc()中也有unlink()宏</span>，所以如果程序写的有问题的话，照样可以被用来利用改变程序流程，例如著名的double-free漏洞利用
+- [x] 新版堆管理算法ptmalloc2引入的fastbin机制客观上
+增加了溢出攻击的难度。必须设法绕过fastbin机制
+- [x] Heap Spray(堆喷射)
+  - <span style="color:blue;">栈溢出和堆溢出相结合</span>的一种技术
+  - 首先将shellcode放置到<span style="color:blue;">堆</span>中，然后在<span style="color:blue;">栈溢出</span>时，控制函数执行流程，跳转到堆中执行shellcode
+
 ## 整数溢出漏洞
+
+### 整数溢出
+
+```c
+/* int.c */
+#include <stdio.h>
+int func(char *userdata , short datalength ){
+  char  *buff;
+  if(datalength != strlen(userdata)){
+    printf("error in func\n");
+    return -1;
+  }
+  datalength = datalength * 2;
+  buff = malloc(datalength);
+  strncpy( buff, userdata, datalength);
+
+  printf("userdata: %s\n", userdata);
+  printf("buff: %s\n", buff);
+
+  return 0;
+}
+
+int main(int argc, char *argv[]){
+  if(argc>1){
+    func( argv[1], strlen(argv[1]) );
+  }else{
+    printf("error in main\n");
+  }
+}
+```
+
+> - <span style="color:blue;">长度值是短整型数的，其数据的取值范围在-32768 ~ 32767，datalength \*2后可能会超出16位short整型数所能表示的最大值，造成datalength \* 2 < datalength</span>
+
+```term
+$ gcc-g -o int int.c
+int.c: In function `func':
+int.c:12: warning: assignment makes pointer from integer without a cast
+$ ./int aaaaaaaaaaaaaaaa
+userdata: aaaaaaaaaaaaaaaa
+buff: aaaaaaaaaaaaaaaa
+$ ./int `perl-e 'print "A" x 16383'`
+…
+$ ./int `perl -e 'print "A" x 16384'`
+Segmentation fault
+```
+
+- [x] 由于整数在内存里面保存在一个<span style="color:red;">固定长度</span>(例如使用32位)的空间内，它能存储的<span style="color:red;">最大值就是固定的</span>
+- [x] <span style="color:red;">当尝试去存储一个数，而这个数又大于这个固定的最大值时，将会导致整数溢出</span>
+
+```asm
+num1 = 0xFFFFFFFF;        11111111 11111111 11111111 11111111
+num2 = 0x00000001;        00000000 00000000 00000000 00000001  
+num3 = num1 + num2;       00000000 00000000 00000000 00000000
+```
+
+```c
+/* int_width_overflow.c */
+#include <stdio.h>
+int main(void){
+  int l;
+  short s;
+  char c;
+  l = 0xdeadbeef;
+  s = l;
+  c = l;
+  printf("l = 0x%x (%d bits)\n", l, sizeof(l) * 8);
+  printf("s = 0x%x (%d bits)\n", s, sizeof(s) * 8);
+  printf("c = 0x%x (%d bits)\n", c, sizeof(c) * 8);
+  return 0;
+}
+```
+
+```term
+$ gcc -g -o int_width_overflow int_width_overflow.c
+$ ./int_width_overflow
+1 = 0xdeadbeef(32 bits)
+1 = 0xffffbeef(64 bits)
+1 = 0xffffffef(8 bits)
+```
+
+```c
+/* int_width_overflow2.c */
+#include <stdio.h>
+#include <string.h>
+int main(int argc, char *argv[]){
+  unsigned short s;
+  int i;
+  char buf[80];
+  if(argc < 3){
+    return -1;
+  }
+  i = atoi(argv[1]);
+  s = i;
+  if(s >= 80){       
+    /* [w1] */
+    printf("Oh no you don't!\n");
+    return -1;
+  }
+  printf("s = %d\n", s);
+  memcpy(buf, argv[2], i);
+  buf[i] = '\0';
+  printf("%s\n", buf);
+  return 0;
+```
+
+- [x] <span style="color:blue;">unsigned short是2个字节，最大为65535</span>
+- [x] <span style="color:blue;">int是4个字节</span>
+- [x] <span style="color:blue;">输入的是65537=0x10001，被砍成1后顺利通过检查</span>
+- [x] <span style="color:blue;">但memcpy实际长度参数为65537</span>
+
+```term
+$ gcc -g -o int_width_overflow2 int_width_overflow2.c
+$ ./int_width_overflow2 65537 asdfg
+s = 1
+Segmentation fault
+```
+
+### 整数溢出的危害
+
+- [x] 如果一个整数用来计算一些敏感数值，如 `缓冲区大小或数组索引` ，就会产生 `潜在的危险`
+- [x] 不过，并不是所有的整数溢出都可以被利用，毕竟，整数溢出 `并没有改写额外的内存`
+- [x] 但是，在有些情况下，整数溢出将会导致"不能确定的行为"，由于整数溢出出现之后，很难被立即察觉，比较难用一个有效的办法去判断是否出现或者可能出现整数溢出
+
 ## 格式化字符串漏洞
+
+### 如何改写内存地址内容？
+
+- [x] 利用栈溢出、堆溢出等都能实现改写内存地址内容
+- [x] 还有其他方式，例如printf()语句：
+
+```c
+#include <stdio.h>
+
+void function(int a, int b, int c)
+{
+  char buffer1[5];
+  char buffer2[10];
+  int *ret;
+  ret = buffer1 + 12;
+  // (*ret) += 8;   
+  printf(…); //自己构造，使打印出0
+}
+
+int main()
+{
+  int x;
+  x = 0;
+  function(1,2,3);
+  x = 1;
+  printf("%d\n",x);
+}
+```
+
+### 可变参数函数
+
+- [x] printf()函数用于<span style="color:red;">按照某个格式输出</span>字符串
+  - <kbd style="color:cyan;">int printf(“Hello, %s”, name);</kbd>
+  - <kbd style="color:green;">int printf(“Hello, %s, %d \n”, name, i);</kbd>
+  - <span style="color:red;">第一个参数</span>叫作<span style="color:red;">格式化字符串</span>(format string) ，用来定义输出的格式
+  - 格式化字符串使用字符<span style="color:blue;">%标记的占位符</span>，printf()函数在打印过程中向占位符的位置填充数据
+- [x] printf函数与其他函数有很大不同
+  - 多数函数接收<span style="color:blue;">固定数目的参数</span>
+  - printf函数可以接收<span style="color:blue;">任意数目(≥1)的参数</span>
+- [x] 编译器检查
+  - 如果一个函数的定义中有三个参数，但调用时只传递了两个参数，编译器将<span style="color:blue;">报错</span>
+  - 无论给printf()函数传递多少个参数，编译器都认为<span style="color:blue;">合法</span>
+- [x] printf()函数是通过一种特殊方式定义的：
+
+```c
+#include <stdio.h> 
+int printf(const char *format, ...); 
+int fprintf(FILE *stream, const char *format, ...); 
+int sprintf(char *str, const char *format, ...); 
+int snprintf(char *str, size_t size, const char *format, ...);
+```
+> - .<span style="color:red;">..可变参数</span>没有名字，printf()函数<span style="color:red;">如何访问</span>？
+
+### 基础知识：VA_LIST
+
+- [x] VA_LIST 是在C语言中<span style="color:red;">解决变参问题</span>的一组<span style="color:red;">宏</span>，所在头文件：#include <stdarg.h> ，用于获取<span style="color:red;">不确定个数的参数</span>
+
+```c
+va_list ap;       //声明一个变量来转换参数列表
+va_start(ap,fmt); //初始化变量
+va_arg(ap,type);  //取出参数
+va_end(ap);       //结束变量列表,和va_start成对使用
+```
+
+### 如何使用可变参数
+
+- [x] 编写一个简单的myprint()函数来演示printf()如何工作
+
+```c
+#include <stdio.h>
+#include <stdarg.h>
+
+int myprint(int Narg, ...){
+  int i;
+  va_list ap;  // 1
+
+  va_start(ap, Narg);  // 2
+  for (i = 0; i < Narg; i++){
+    printf("%d ", va_arg(ap, int));  // 3
+    printf("%f\n", va_arg(ap, double));  // 4
+  }
+  va_end(ap);  // 5
+}
+
+int main(){
+  myprintf(1, 2, 3.5);
+  myprintf(2, 2, 3.5, 3, 4.5);
+  return 1;
+}
+```
+
+- [x]  考虑myprintf()在被调用
+  - 初始化va_list指针：
+    - 第1行定义了一个va_list指针ap，用于访问可变参数
+    - 第2行的宏va_start根据它的第二个参数Narg(即myprintf()函数的第一个参数)来计算va_list的起始位置(就是为什么myprintf()函数至少必须有一个固定参数)
+    - 宏va_start()获得Narg的地址(设为A)，根据其类型(int)计算它的长度(设为B),然后设置va_list指针ap指向A+B，实际上就是指向Narg正上面的内存位置
+  - 移动va_list指针：
+    - 为了使用va_list访问可变参数，需要利用va_arg()宏，它需要两个参数：第一个是va_list指针，第二个是所访问可变参数的类型
+    - va_arg()宏返回va_list指针指向的值，并使指针指向下一个可变参数的位置(第3行和第4行)例如：va_arg(ap, int) 把指针ap上移4个字节
+  - 结束：
+    - 当程序访问完所有可变参数时，调用va_end()宏(第5行)来做必要的清理工作
+
+<p align="center">
+  <img src="./img/栈帧的布局.png"></img>
+</p>
+
+- [x] 与myprintf()函数相比，printf()函数同样使用 `第一个参数(格式化字符串)` 来达到相同目的，但实现方式却完全不同
+
+```c
+#include <stdio.h>
+
+int main(){
+  int id = 100, age = 25;
+  char *name = "Bob Smith";
+  printf("ID: %d, Name: %s, Age: %d\n", id, name, age);
+}
+```
+
+- [x] printf()函数含有三个可变参数。它的格式化字符串中有三个 `以%引导` 的元素( `格式规定符` ，format specifiers)
+- [x] printf()函数扫描格式化字符串，打印出每个遇到的字符，直到 `遇到一个以%引导` 的格式规定符
+- [x] printf()函数调用va_arg()来<span style="color:red;">获得当前va_list指针指向的可变参数</span>,同时va_arg()把指针移到下一个可变参数
+
+<p align="center">
+  <img src="./img/栈帧的布局1.png"></img>
+</p>
+
+- [x] 当printf()函数被调用时，参数以 `倒序` 压入栈中
+- [x] 扫描并打印格式化字符串时，printf()函数用第一个可变参数(标记为①)替代第一个格式规定符(%d)，并输出它的值100
+- [x] 接着va_list指针移动到②处
+
+### 可变参数函数
+
+```c
+#include <stdarg.h> 
+int vprintf(const char *format, va_list ap); 
+int vfprintf(FILE *stream, const char *format, va_list ap); 
+int vsprintf(char *str, const char *format, va_list ap); 
+int vsnprintf(char *str, size_t size, const char *format, va_list ap);
+```
+
+- [x] 另外还有：
+  - setproctitle, syslog, err*, verr*, warn*, vwarn*等
+
+### 格式化字符串：constchar *format
+
+- [x] format 参数是包含三种对象类型的字符串
+  - <span style="color:red;">无格式字符</span>，复制到输出
+  - <span style="color:red;">格式规定符(转换规范)</span>，每个规范导致在值参数列表中检索1 个或更多个项
+  - <span style="color:red;">转义序列</span>，例如“\n”
+- [x] 通常意义上format的 <span style="color:red;">格式规定符</span> 如下：
+  - <kbd>%[flags][width][.prec][F|N|h|l]type</kbd>
+
+#### <kbd>%[flags][width][.prec][F|N|h|l]type</kbd>
+
+- [x] type 用于规定输出数据的 `类型`
+
+<p align="center">
+  <img src="./img/type用于规定输出数据的类型.png"></img>
+</p>
+<p align="center">
+  <img src="./img/type用于规定输出数据的类型1.png"></img>
+</p>
+
+- [x] flags 规定输出 `样式`
+
+<p align="center">
+  <img src="./img/flags规定输出样式.png"></img>
+</p>
+
+- [x] width 用于控制 `显示数值的宽度`
+- [x] n(n=1,2,3...)： 宽度至少为n位， <span style="color:red;">不够以空格填充</span>
+- [x] 如果转换值字符少于字段宽度，该字段将<span style="color:red;">从左到右按指定的字段宽度填充</span>。如果指定了左边调整选项，字段将在右边填充
+- [x] 如果转换结果宽于字段宽度，将扩展该字段以包含转换后的结果。不会发生截断。然而，小的精度可能导致在右边发生截断
+
+- [x] prec 用于控制 `小数点后面的位数`
+- [x] 无按缺省精度显示0
+  - 当type=d,i,o,u,x时，没有影响；
+  - type=e,E,f时，不显示小数点
+- [x] n(n=1,2,3...)
+  - 当type=e,E,f时表示的最大小数位数；
+  - type=其他，表示显示的最大宽度
+
+- [x] [F|N|h|l 表示指针是否是远指针或整数是否是长整数
+  - F 远指针(32位，可指向内存中的任意目标)
+  - N 近指针(16位，只表示段内的偏移地址)
+  - h 短整数(short int)
+  - l 长整数(long int) (此处如果与d搭配为%lld则为long long int(C99)，与f搭配为%llf则为long double(C99))
+
+#### 转义序列/ 转义字符
+
+- [x] 转义序列在字符串中会被自动转换为相应 `操作命令`
+
+<p align="center">
+  <img src="./img/转义序列.png"></img>
+</p>
+
+### 格式化字符串漏洞的大约情形
+
+- [x] 错误用法:
+  ```c
+  int func (char *user){
+    printf (user);
+  }
+  ```
+- [x] 正确用法:
+  ```c
+  int func (char *user){
+    printf ("%s", user);
+  }
+  ```
+
+### 格式化字符串漏洞的类型
+
+- [x] 用户提供部分格式化字符串，例如：
+  ```c
+  char tmpbuf[512];
+  snprintf (tmpbuf, sizeof (tmpbuf), "foo: %s", user);
+  tmpbuf[sizeof (tmpbuf) - 1] = ’\0’;
+  syslog (LOG_NOTICE, tmpbuf);
+  ```
+- [x] 用户提供全部格式化字符串，例如：
+  ```c
+  int Error (char *fmt, ...);...
+  int someotherfunc (char *user){  ...
+    Error (user);  ...
+  }
+  ```
+
+### 格式化字符串函数的压栈细节
+
+- [x] 例: <kbd style="color:green;">printf ("Number %d has no address, number %d has: %08x\n", i, a, &a);</kbd>
+
+<p align="center">
+  <img src="./img/格式化字符串函数的压栈细节.png"></img>
+</p>
+
+### 如果参数数量不匹配会发生什么？
+
+- [x] <kbd style="color:purple;">printf ("a has value %d, b has value %d, c is at address: %08x\n",a, b);</kbd>
+- [x] 在上面的例子中格式字符串需要3个参数，但程序只提供了2个
+- [x] <span style="color:red;">该程序能够通过编译么</span>？
+  - printf()是一个参数长度可变函数。因此，仅仅看参数数量是看不出问题的
+  - 为了查出不匹配，编译器需要了解printf()的运行机制，然而编译器通常不做这类分析
+  - 有些时候，格式字符串并不是一个常量字符串，它在程序运行期间生成(比如用户输入)，因此，<span style="color:red;">编译器无法发现不匹配</span>
+- [x] <span style="color:red;">printf()函数自身能检测到不匹配么</span>？
+  - printf()从栈上取得参数，如果格式字符串需要3个参数，它会从栈上取3个，除非栈被标记了边界，<span style="color:blue;">printf()并不知道自己是否会用完提供的所有参数</span>
+  - 既然没有那样的边界标记。printf()会<span style="color:blue;">持续从栈上抓取数据</span>，在一个参数数量不匹配的例子中，它<span style="color:blue;">会抓取到一些不属于该函数调用到的数据</span>
+- [x] 如果有人特意准备数据让printf抓取会发生什么呢？
+
+### 格式化字符串漏洞的危害
+
+<!-- tabs:start -->
+
+#### **攻击一：输出栈中的数据**
+
+```term
+$ cat print.c
+#include "stdio.h"
+void main(){
+  printf ("%08x.%08x.%08x.%08x.%08x\n");
+}
+$ gcc-g -o print print.c
+print.c: In function 'main':
+print.c:3: warning: return type of 'main' is not 'int'
+$ ./print 
+4f17ee28.4f17ee38.00000000.5be952e0.5b937b70
+```
+
+#### **攻击二：使程序崩溃**
+
+```term
+$ cat print.c
+#include "stdio.h"
+void main()
+{
+  printf ("%s%s%s%s%s%s%s%s%s%s%s%s");
+}
+$ gcc-g -o print print.c
+print.c: In function 'main':
+print.c:3: warning: return type of 'main' is not 'int'
+$ ./print 
+段错误
+```
+
+#### **攻击三：访问任意位置内存**
+
+- [x] 需要得到一段数据的内存地址，但我们无法修改代码，供我们使用的<span style="color:blue;">只有格式字符串</span>
+- [x] 如果调用<span style="color:red;">printf("%s")</span>时没有指明内存地址, 那么目标地址就可以通过printf函数，在栈上的任意位置获取。printf函数维护一个初始栈指针,所以能够得到所有参数在栈中的位置
+- [x] 观察: 格式字符串位于栈上。如果我们可以<span style="color:red;">把目标地址编码进格式字符串，那样目标地址也会存在于栈上</span>，在接下来的例子里，格式字符串将保存在栈上的缓冲区中
+
+```c
+int main(int argc, char *argv[])
+{
+  char user_input[100];
+  ... ... /* other variable definitions and statements */
+  scanf("%s", user_input); /* getting a string from user */
+  printf(user_input); /* Vulnerable place */
+  return 0;
+}
+```
+
+- [x] 如果让printf函数得到格式字符串中的目标内存地址(该地址也存在于栈上), 我们就可以访问该地址
+  ```c
+  printf ("\x10\x01\x48\x08 %x %x %x %x %s");
+  ```
+- [x] `\x10\x01\x48\x08` 是目标地址的四个字节， 在C语言中, `\x10` 告诉编译器将一个16进制数0x10放于当前位置(占1字节)。如果去掉前缀\x10就相当于两个ascii字符1和0了，这就不是我们所期望的结果了
+- [x] %x 导致栈指针向格式字符串的方向移动
+
+<p align="center">
+  <img src="./img/访问任意位置内存.png"></img>
+</p>
+
+- [x] 使用四个%x来移动printf函数的栈指针到存储格式字符串的位置，一旦到了目标位置，<span style="color:red;">使用％s来打印，它会打印位于地址0x10014808的内容</span>，因为是将其作为字符串来处理，所以会一直打印到结束符为止
+- [x] <span style="color:blue;">user_input数组到传给printf函数参数的地址之间的栈空间不是为了printf函数准备的</span>。但是，因为程序本身存在格式字符串漏洞，所以<span style="color:blue;">printf会把这段内存当作传入的参数来匹配％x</span>
+- [x] 最大的挑战就是想方设法找出<span style="color:blue;">printf函数栈指针(函数取参地址)到user_input数组的这一段</span><span style="color:red;">距离是多少</span>，这段距离决定了你需要在%s之前<span style="color:red;">输入多少个%x</span>
+
+```term
+$ cat print.c
+#include "stdio.h"
+void main()
+{
+  printf ("\x10\x01\x48\x08_%08x.%08x.%08x.%08x.%08x|%s|"); // \x10\x01\x48\x08_%08为address
+}
+$ gcc-g -o print print.c
+print.c: In function 'main':
+print.c:3: warning: return type of 'main' is not 'int'
+$ ./print 
+_605501f8.60550208.00000000.4aac22e0.4a564b70|(null)|
+```
+
+#### **攻击四：改写任意位置内存**
+
+- [x] 完全利用格式化字符串exploit
+  - 幸好，存在一种格式化字符串<span style="color:blue;">%n</span>，可以用来攻击先前的那段代码
+  - <span style="color:red;">%n用来向某个整数指针所指的整数变量里写入先前已经输出的字符数</span>，例如：
+    ```c
+    int i = 0;
+    printf (“myUSTC%n\n", (int *) &i);
+    printf ("i = %d\n", i);
+    ```
+   > - 将打印出“i= 6”
+  - 如果要让i=10000怎么办？
+    - %n之前写入10000个字符
+    - 利用%10000d
+- [x] 利用“%n”这个性质，可以向任何内存写入一个数
+- [x] 例如：只要将上一小节的%s替换成%n就能够覆盖0x10014808的内容
+  ```c
+  printf ("\x10\x01\x48\x08 %x %x %x %x %n");
+  ```
+- [x] 利用%n可以做到
+  - `重写` 栈或者函数等的 `返回地址`
+  - `重写程序标识` 控制访问权限
+- [x] 类似普通缓冲区覆盖函数返回地址
+  - 例如：
+    ```c
+    char outbuf[512];
+    char buffer[512];
+    sprintf (buffer, "ERR Wrong command: %400s", user);
+    sprintf (outbuf, buffer);
+    ```
+    > - 提供类似如下的格式化字符串：
+    > - "%497d\x3c\xd3\xff\xbf<nops><shellcode>"
+- [x] 更快的方法
+
+<p align="center">
+  <img src="./img/改写任意位置内存.png"></img>
+</p>
+
+<!-- tabs:end -->
+
+
+
+
